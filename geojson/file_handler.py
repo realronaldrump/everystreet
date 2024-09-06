@@ -17,6 +17,11 @@ class FileHandler:
         for feature in new_features:
             feature["geometry"]["coordinates"] = self._convert_ndarray_to_list(feature["geometry"]["coordinates"])
             timestamp = feature["properties"]["timestamp"]
+
+            # Ensure timestamp is numeric by converting it to an integer or float
+            if isinstance(timestamp, str):
+                timestamp = int(timestamp)  # or float(timestamp), depending on your data format
+
             date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
             month_year = date.strftime("%Y-%m")
 

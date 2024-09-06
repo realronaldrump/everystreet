@@ -72,8 +72,17 @@ class TripProcessor:
                     path_array = np.array(path)
                     if path_array.shape[1] >= 5:  # Check for lat, lon, timestamp at least
                         for lat, lon, _, _, timestamp in path_array[:, [0, 1, 2, 3, 4]]:
+                            if timestamp is None:
+                                logger.warning(f"Skipping point with None timestamp: {path}")
+                                continue
+
+                            try:
+                                iso_timestamp = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+                            except (TypeError, ValueError) as e:
+                                logger.error(f"Invalid timestamp {timestamp}: {str(e)}. Skipping point.")
+                                continue
+
                             coordinates.append([lon, lat])
-                            iso_timestamp = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
                             timestamps.append(iso_timestamp)
                     else:
                         logger.warning(f"Skipping invalid path: {path}")

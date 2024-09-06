@@ -7,20 +7,30 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+from dateutil import parser  # Add this import
+
 class FileHandler:
     async def update_monthly_files(self, handler, new_features):
         logger.info(f"Starting update_monthly_files with {len(new_features)} new features")
         
         # Track months that had new features added
         months_to_update = set()
-        
+
         for feature in new_features:
             feature["geometry"]["coordinates"] = self._convert_ndarray_to_list(feature["geometry"]["coordinates"])
             timestamp = feature["properties"]["timestamp"]
 
-            # Ensure timestamp is numeric by converting it to an integer or float
+            # Handle ISO 8601 and Unix timestamps
             if isinstance(timestamp, str):
-                timestamp = int(timestamp)  # or float(timestamp), depending on your data format
+                try:
+                    # Parse the ISO 8601 timestamp string
+                    parsed_date = parser.isoparse(timestamp)
+                    timestamp = parsed_date.timestamp()  # Convert to Unix timestamp
+                except ValueError:
+                    logger.error(f"Invalid timestamp format: {timestamp}")
+                    continue  # Skip this feature if the timestamp is invalid
+            else:
+                timestamp = float(timestamp)  # Ensure the timestamp is numeric
 
             date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
             month_year = date.strftime("%Y-%m")
@@ -37,7 +47,7 @@ class FileHandler:
         await self._write_updated_monthly_files(handler, months_to_update)
 
         logger.info(f"Updated monthly files with {len(new_features)} new features")
-
+        
     async def _write_updated_monthly_files(self, handler, months_to_update):
         write_tasks = []
         for month_year in months_to_update:

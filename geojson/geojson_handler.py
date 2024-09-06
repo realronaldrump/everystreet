@@ -1,0 +1,54 @@
+import logging
+from collections import defaultdict
+from datetime import datetime, timezone
+
+from .data_loader import DataLoader
+from .data_processor import DataProcessor
+from .progress_updater import ProgressUpdater
+
+logger = logging.getLogger(__name__)
+
+class GeoJSONHandler:
+    def __init__(self, waco_analyzer):
+        self.waco_analyzer = waco_analyzer
+        self.data_loader = DataLoader()
+        self.data_processor = DataProcessor(waco_analyzer)
+        self.progress_updater = ProgressUpdater(waco_analyzer)
+        self.historical_geojson_features = []
+        self.fetched_trip_timestamps = set()
+        self.monthly_data = defaultdict(list)
+
+    async def load_historical_data(self):
+        await self.data_loader.load_data(self)
+        await self.update_all_progress()
+
+    async def update_historical_data(self, fetch_all=False):
+        await self.data_processor.update_and_process_data(self, fetch_all)
+
+    async def filter_geojson_features(self, start_date, end_date, filter_waco, waco_limits, bounds=None):
+        return await self.data_processor.filter_features(self, start_date, end_date, filter_waco, waco_limits, bounds)
+
+    async def update_all_progress(self):
+        return await self.progress_updater.update_progress(self)
+
+    def get_progress(self):
+        return self.waco_analyzer.calculate_progress()
+
+    def get_progress_geojson(self, waco_boundary='city_limits'):
+        return self.waco_analyzer.get_progress_geojson(waco_boundary)
+
+    async def get_recent_historical_data(self):
+        return await self.data_processor.get_recent_data(self)
+
+    def get_waco_streets(self, waco_boundary, streets_filter='all'):
+        return self.data_processor.get_streets(self, waco_boundary, streets_filter)
+
+    def get_untraveled_streets(self, waco_boundary):
+        return self.waco_analyzer.get_untraveled_streets(waco_boundary).to_json()
+
+    async def update_waco_streets_progress(self):
+        return await self.progress_updater.update_streets_progress(self)
+
+    def get_all_routes(self):
+        logger.info(f"Retrieving all routes. Total features: {len(self.historical_geojson_features)}")
+        return self.historical_geojson_features

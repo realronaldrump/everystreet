@@ -1,0 +1,42 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "CITY": "Waco Simplified",
+        "Shape_Leng": 0.0,
+        "CITY_LIM20": "Yes"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              [
+                -97.4055691,
+                31.731341
+              ],
+              [
+                -97.4055691,
+                31.432303
+              ],
+              [
+                -97.0315889,
+                31.432303
+              ],
+              [
+                -97.0315889,
+                31.731341
+              ],
+              [
+                -97.4055691,
+                31.731341
+              ]
+            ]
+          ]
+        ],
+        "type": "MultiPolygon"
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment directories
+env/
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# macOS system files
+.DS_Store
+
+# IDE files
+.idea/
+
+# Log files
+*.log
+logs/
+
+# Generated data files
+static/historical_data*.gpx
+live_route_data.geojson
+waco_streets_cache.pkl
+
+# Vercel deployment files
+.vercel
+
+# Editor backup files
+.aider*
+
+# Temporary files
+static/historical_date_temp
+
+# Test files
+test_bouncie_api.py
+
+# Example response file
+print_response.py

@@ -24,6 +24,7 @@ logs/
 
 # Generated data files
 static/historical_data*.gpx
+static/historical_data_*.geojson # This line will ignore all historical data geojson files
 live_route_data.geojson
 waco_streets_cache.pkl
 

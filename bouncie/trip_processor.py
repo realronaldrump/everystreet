@@ -73,7 +73,8 @@ class TripProcessor:
                     if path_array.shape[1] >= 5:  # Check for lat, lon, timestamp at least
                         for lat, lon, _, _, timestamp in path_array[:, [0, 1, 2, 3, 4]]:
                             coordinates.append([lon, lat])
-                            timestamps.append(timestamp)
+                            iso_timestamp = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+                            timestamps.append(iso_timestamp)
                     else:
                         logger.warning(f"Skipping invalid path: {path}")
 

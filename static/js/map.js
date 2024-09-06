@@ -513,25 +513,42 @@ async function loadWacoStreets() {
 
 // Add a popup to a route feature
 function addRoutePopup(feature, layer) {
-  const timestamp = feature.properties.timestamp || feature.timestamp;
-  const date = new Date(timestamp * 1000).toLocaleDateString();
-  const time = new Date(timestamp * 1000).toLocaleTimeString();
+  const timestamp = feature.properties.timestamp;
+  let formattedDate = 'N/A';
+  let formattedTime = 'N/A';
+
+  if (timestamp) {
+      try {
+          const date = new Date(timestamp);
+          if (!isNaN(date.getTime())) {
+              formattedDate = date.toLocaleDateString();
+              formattedTime = date.toLocaleTimeString();
+          } else {
+              console.error('Invalid date:', timestamp);
+          }
+      } catch (error) {
+          console.error('Error parsing date:', error);
+      }
+  } else {
+      console.warn('No timestamp provided for feature');
+  }
+
   const distance = calculateTotalDistance([feature]);
 
   const playbackButton = document.createElement('button');
   playbackButton.textContent = 'Play Route';
   playbackButton.classList.add('animate__animated', 'animate__pulse');
   playbackButton.addEventListener('click', () => {
-    if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
-      startPlayback(feature.geometry.coordinates);
-    } else if (feature.geometry.type === 'MultiLineString') {
-      const validSegments = feature.geometry.coordinates.filter(segment => segment.length > 1);
-      validSegments.forEach(startPlayback);
-    }
+      if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
+          startPlayback(feature.geometry.coordinates);
+      } else if (feature.geometry.type === 'MultiLineString') {
+          const validSegments = feature.geometry.coordinates.filter(segment => segment.length > 1);
+          validSegments.forEach(startPlayback);
+      }
   });
 
   const popupContent = document.createElement('div');
-  popupContent.innerHTML = `Date: ${date}<br>Time: ${time}<br>Distance: ${distance.toFixed(2)} miles`;
+  popupContent.innerHTML = `Date: ${formattedDate}<br>Time: ${formattedTime}<br>Distance: ${distance.toFixed(2)} miles`;
   popupContent.appendChild(playbackButton);
 
   layer.bindPopup(popupContent);

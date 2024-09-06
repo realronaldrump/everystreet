@@ -121,7 +121,7 @@ class WacoStreetsAnalyzer:
         logger.info("Generating progress GeoJSON...")
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = gpd.read_file(f"static/{waco_boundary}.geojson").geometry.unary_union
+            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson").geometry.unary_union
 
         self.streets_gdf['traveled'] = self.streets_gdf.index.isin(self.traveled_streets)
 
@@ -146,7 +146,7 @@ class WacoStreetsAnalyzer:
         logger.info("Generating untraveled streets...")
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = gpd.read_file(f"static/{waco_boundary}.geojson").geometry.unary_union
+            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson").geometry.unary_union
 
         untraveled_streets = self.streets_gdf[~self.streets_gdf.index.isin(self.traveled_streets)]
         if waco_limits is not None:
@@ -158,7 +158,7 @@ class WacoStreetsAnalyzer:
         logger.info("Retrieving street network...")
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = gpd.read_file(f"static/{waco_boundary}.geojson").geometry.unary_union
+            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson").geometry.unary_union
 
         street_network = self.streets_gdf.copy()
         if waco_limits is not None:

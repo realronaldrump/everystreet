@@ -156,7 +156,7 @@ class DataProcessor:
                     continue
 
                 if 'timestamp' in month_features.columns:
-                    month_features['timestamp'] = pd.to_datetime(month_features['timestamp'], unit='s', utc=True)
+                    month_features['timestamp'] = pd.to_datetime(month_features['timestamp'], utc=True)
                     mask = (month_features['timestamp'] >= start_datetime) & (month_features['timestamp'] <= end_datetime)
                 else:
                     logger.warning(f"No 'timestamp' column found in data for {month_year}. Skipping filtering by date.")

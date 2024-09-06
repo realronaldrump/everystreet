@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
-
+import json
 from .data_loader import DataLoader
 from .data_processor import DataProcessor
 from .progress_updater import ProgressUpdater
@@ -52,3 +52,23 @@ class GeoJSONHandler:
     def get_all_routes(self):
         logger.info(f"Retrieving all routes. Total features: {len(self.historical_geojson_features)}")
         return self.historical_geojson_features
+
+    def load_waco_boundary(self, boundary_type):
+        """Loads the GeoJSON data for the specified Waco boundary type."""
+        try:
+            if boundary_type == "city_limits":
+                file_path = "static/boundaries/city_limits.geojson"
+            elif boundary_type == "less_goofy":
+                file_path = "static/boundaries/less_goofy.geojson"
+            elif boundary_type == "goofy":
+                file_path = "static/boundaries/goofy.geojson"
+            else:
+                logger.warning(f"Unknown Waco boundary type: {boundary_type}")
+                return None
+
+            with open(file_path, 'r') as f:
+                return json.load(f)
+
+        except Exception as e:
+            logger.error(f"Error loading Waco boundary: {e}")
+            return None

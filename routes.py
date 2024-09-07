@@ -352,7 +352,8 @@ def register_routes(app):
                 await bouncie_api.client.client_session.close()
                 logger.info("Bouncie API client session closed")
 
-            if geojson_handler.bouncie_api.client and geojson_handler.bouncie_api.client.client_session.close()
+            if geojson_handler.bouncie_api.client and geojson_handler.bouncie_api.client.client_session:
+                await geojson_handler.bouncie_api.client.client_session.close()
                 logger.info("GeoJSON handler Bouncie API client session closed")
 
         except Exception as e:

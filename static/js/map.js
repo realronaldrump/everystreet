@@ -96,17 +96,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Initialize the Leaflet map
 function initMap() {
   try {
-    const newMap = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
+    if (map) {
+      map.remove(); // Remove existing map if it exists
+    }
+    map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19
-    }).addTo(newMap);
+    }).addTo(map);
 
     // Create map panes with correct z-index order
-    newMap.createPane('wacoLimitsPane').style.zIndex = 400;
-    newMap.createPane('progressPane').style.zIndex = 410;
-    newMap.createPane('historicalDataPane').style.zIndex = 430;
-    newMap.createPane('wacoStreetsPane').style.zIndex = 440;
+    map.createPane('wacoLimitsPane').style.zIndex = 400;
+    map.createPane('progressPane').style.zIndex = 410;
+    map.createPane('historicalDataPane').style.zIndex = 430;
+    map.createPane('wacoStreetsPane').style.zIndex = 440;
 
     // Add progress controls
     const progressControl = L.control({ position: 'bottomleft' });
@@ -115,11 +118,11 @@ function initMap() {
       div.innerHTML = '<div id="progress-bar-container"><div id="progress-bar"></div></div><div id="progress-text"></div>';
       return div;
     };
-    progressControl.addTo(newMap);
+    progressControl.addTo(map);
 
     // Initialize drawing tools
     drawnItems = new L.FeatureGroup();
-    newMap.addLayer(drawnItems);
+    map.addLayer(drawnItems);
 
     const drawControl = new L.Control.Draw({
       draw: {
@@ -134,25 +137,25 @@ function initMap() {
         featureGroup: drawnItems
       }
     });
-    newMap.addControl(drawControl);
+    map.addControl(drawControl);
 
     // Event listeners for drawing tools
-    newMap.on(L.Draw.Event.CREATED, (e) => {
+    map.on(L.Draw.Event.CREATED, (e) => {
       drawnItems.addLayer(e.layer);
       filterHistoricalDataByPolygon(e.layer);
     });
 
-    newMap.on(L.Draw.Event.EDITED, (e) => {
+    map.on(L.Draw.Event.EDITED, (e) => {
       e.layers.eachLayer(filterHistoricalDataByPolygon);
     });
 
-    newMap.on(L.Draw.Event.DELETED, displayHistoricalData);
+    map.on(L.Draw.Event.DELETED, displayHistoricalData);
 
-    return newMap;
+    showFeedback('Map initialized successfully', 'success');
+    return map;
   } catch (error) {
-    console.error('Error initializing map:', error);
-    showFeedback('Error initializing map. Please refresh the page.', 'error');
-    throw error;
+    handleError(error, 'initializing map');
+    throw error; // Re-throw to allow for further handling if needed
   }
 }
 
@@ -175,7 +178,7 @@ async function initWacoLimitsLayer() {
       },
       pane: 'wacoLimitsPane'
     });
-    updateWacoLimitsLayerVisibility();
+    updateWacoLimitsLayerVisibility(); 
   } catch (error) {
     console.error('Error initializing Waco limits layer:', error);
     showFeedback('Error loading Waco limits. Some features may be unavailable.', 'error');
@@ -187,15 +190,7 @@ function updateWacoLimitsLayerVisibility() {
   const showWacoLimits = document.getElementById('wacoLimitsCheckbox').checked;
 
   if (showWacoLimits && map && !map.hasLayer(wacoLimitsLayer)) {
-    // Only initialize the layer if it doesn't exist yet
-    if (!wacoLimitsLayer) {
-      initWacoLimitsLayer().then(() => {
-        wacoLimitsLayer.addTo(map);
-      });
-    } else {
-      // If the layer already exists, just add it to the map
-      wacoLimitsLayer.addTo(map);
-    }
+    wacoLimitsLayer.addTo(map); // Just add the layer if it's not already on the map
   } else if (!showWacoLimits && map && map.hasLayer(wacoLimitsLayer)) {
     map.removeLayer(wacoLimitsLayer);
   }
@@ -319,37 +314,46 @@ async function loadHistoricalData() {
 }
 
 async function fetchHistoricalData(startDate = null, endDate = null) {
-  const filterWaco = document.getElementById('filterWaco').checked;
-  const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
-  const startDateParam = startDate || document.getElementById('startDate').value;
-  const endDateParam = endDate || document.getElementById('endDate').value;
+  try {
+    const filterWaco = document.getElementById('filterWaco').checked;
+    const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+    const startDateParam = startDate || document.getElementById('startDate').value;
+    const endDateParam = endDate || document.getElementById('endDate').value;
 
-  const response = await fetch(
-    `/historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
-    `&filterWaco=${filterWaco}&wacoBoundary=${wacoBoundary}`
-  );
+    const response = await fetch(
+      `/historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
+      `&filterWaco=${filterWaco}&wacoBoundary=${wacoBoundary}`
+    );
 
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.warn("No historical data found for the specified date range.");
+        return { type: "FeatureCollection", features: [] };
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Ensure data is in valid GeoJSON format
+    if (!data.type || data.type !== 'FeatureCollection') {
+      console.warn('Historical data missing "FeatureCollection" type. Correcting...');
+      data.type = 'FeatureCollection';
+    }
+
+    // Ensure each feature has a valid geometry
+    data.features = data.features.filter(feature => 
+      feature.geometry && 
+      feature.geometry.type === 'LineString' && 
+      Array.isArray(feature.geometry.coordinates) &&
+      feature.geometry.coordinates.length > 1
+    );
+
+    return data;
+  } catch (error) {
+    handleError(error, 'fetching historical data');
+    return { type: "FeatureCollection", features: [] };
   }
-
-  const data = await response.json();
-
-  // Ensure data is in valid GeoJSON format
-  if (!data.type || data.type !== 'FeatureCollection') {
-    console.warn('Historical data missing "FeatureCollection" type. Correcting...');
-    data.type = 'FeatureCollection';
-  }
-
-  // Ensure each feature has a valid geometry
-  data.features = data.features.filter(feature => 
-    feature.geometry && 
-    feature.geometry.type === 'LineString' && 
-    Array.isArray(feature.geometry.coordinates) &&
-    feature.geometry.coordinates.length > 1
-  );
-
-  return data;
 }
 
 // Update the visibility of the Waco streets layer based on checkbox state
@@ -1175,11 +1179,18 @@ function showFeedback(message, type = 'info', duration = FEEDBACK_DURATION) {
   feedbackElement.appendChild(textElement);
   feedbackContainer.appendChild(feedbackElement);
 
+  console.log(`${type.toUpperCase()}: ${message}`); // Log all feedback messages
+
   setTimeout(() => {
     feedbackElement.classList.remove('animate__fadeInDown');
     feedbackElement.classList.add('animate__fadeOutUp');
     setTimeout(() => feedbackElement.remove(), 1000);
   }, duration);
+}
+
+function handleError(error, context) {
+  console.error(`Error in ${context}:`, error);
+  showFeedback(`An error occurred while ${context}. Please try again.`, 'error');
 }
 
 // Handle a background task with UI locking and feedback
@@ -1264,10 +1275,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     showFeedback('Initializing application...', 'info');
 
     // Initialize the map
-    map = initMap();
+    map = await initMap();
 
     // Initialize layers and controls
     await Promise.all([
+      initWacoLimitsLayer(),
       initProgressLayer(),
       initWacoStreetsLayer(),
       loadHistoricalData().catch(error => {
@@ -1290,8 +1302,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     showFeedback('Application initialized successfully', 'success');
   } catch (error) {
-    console.error('Error initializing application:', error);
-    showFeedback(`Error initializing application: ${error.message}. Some features may be unavailable.`, 'error');
+    handleError(error, 'initializing application');
   } finally {
     hideLoading(); // Ensure loading screen is hidden regardless of success or failure
   }

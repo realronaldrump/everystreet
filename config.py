@@ -10,7 +10,6 @@ class Config(BaseSettings):
     DEVICE_IMEI: str
     ENABLE_GEOCODING: bool = False
     GOOGLE_MAPS_API: str
-    REDIS_URL: str
     DEBUG: bool = False
     ANTHROPIC_API_KEY: str
     OPENAI_API_KEY: str

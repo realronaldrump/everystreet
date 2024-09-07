@@ -14,7 +14,6 @@ asyncio
 tqdm
 numpy
 aiofiles
-redis
 tenacity
 pydantic
 httpx

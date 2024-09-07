@@ -66,8 +66,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([
       initProgressLayer(),
       initWacoStreetsLayer(),
-      loadHistoricalData().catch(error => console.error('Historical data loading failed:', error)),
-      loadLiveRouteData()
+      loadHistoricalData().catch(error => {
+        console.error('Historical data loading failed:', error);
+        showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
+      }),
+      loadLiveRouteData().catch(error => {
+        console.error('Live route data loading failed:', error);
+        showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
+      })
     ]);
 
     // Set up data polling and updates
@@ -240,21 +246,26 @@ async function initWacoStreetsLayer() {
       },
       pane: 'wacoStreetsPane',
       onEachFeature: (feature, layer) => {
+        if (feature.properties && feature.properties.name) {
+          layer.bindPopup(feature.properties.name); // Bind the popup here
+        }
+
         layer.on('mouseover', function() {
           this.setStyle({
             color: '#FFFF00', // Highlight color (e.g., yellow)
             weight: 5
           });
-          if (feature.properties.name) {
-            layer.bindPopup(feature.properties.name).openPopup(); // Show street name popup
-          }
         });
+
         layer.on('mouseout', function() {
           this.setStyle({
             color: '#808080', // Revert to original color
             weight: 1
           });
-          layer.closePopup(); // Close the popup
+        });
+
+        layer.on('click', function() {
+          this.openPopup(); // Open the popup on click
         });
       }
     });
@@ -341,17 +352,17 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
   return data;
 }
 
-// Update the visibility of the historical data layer based on checkbox state
-function updateHistoricalDataLayerVisibility() {
-  const showHistoricalData = document.getElementById('historicalDataCheckbox').checked;
-  if (showHistoricalData && historicalDataLayer && map) {
-    historicalDataLayer.addTo(map);
-  } else if (!showHistoricalData && historicalDataLayer && map) {
-    map.removeLayer(historicalDataLayer);
+// Update the visibility of the Waco streets layer based on checkbox state
+function updateWacoStreetsLayerVisibility() {
+  const showWacoStreets = document.getElementById('wacoStreetsCheckbox').checked;
+  if (showWacoStreets && map && !map.hasLayer(wacoStreetsLayer)) {
+    wacoStreetsLayer.addTo(map);
+  } else if (!showWacoStreets && map && map.hasLayer(wacoStreetsLayer)) {
+    map.removeLayer(wacoStreetsLayer);
   }
 }
 
-// Load live route data from the server
+// Load live route data from the server (continued)
 async function loadLiveRouteData() {
   try {
     const data = await fetchGeoJSON('/live_route');
@@ -503,6 +514,7 @@ async function loadProgressData() {
 
 // Load Waco streets data and update the Waco streets layer
 async function loadWacoStreets() {
+  await initWacoStreetsLayer();
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const streetsFilter = document.getElementById('streets-select').value;
@@ -710,7 +722,7 @@ function filterRoutesBy(period) {
   displayHistoricalData();
 }
 
-// Export historical data to a GPX file
+// Export historical data to a GPX file (continued)
 async function exportToGPX() {
   showLoading('Preparing GPX export...');
   try {
@@ -847,6 +859,16 @@ function enableFilterControls() {
     });
 }
 
+// Update the visibility of the historical data layer based on checkbox state
+function updateHistoricalDataLayerVisibility() {
+  const showHistoricalData = document.getElementById('historicalDataCheckbox').checked;
+  if (showHistoricalData && map && historicalDataLayer && !map.hasLayer(historicalDataLayer)) {
+    historicalDataLayer.addTo(map);
+  } else if (!showHistoricalData && map && historicalDataLayer && map.hasLayer(historicalDataLayer)) {
+    map.removeLayer(historicalDataLayer);
+  }
+}
+
 // Set up event listeners for all controls
 function setupEventListeners() {
   // Filter Controls
@@ -931,7 +953,7 @@ function setupEventListeners() {
 
   const playbackSpeedInput = document.getElementById('playbackSpeed');
   if (playbackSpeedInput) {
-    playbackSpeedInput.addEventListener('input', adjustPlaybackSpeed   );
+    playbackSpeedInput.addEventListener('input', adjustPlaybackSpeed);
   }
 
   // Search Controls
@@ -1005,15 +1027,16 @@ function setupEventListeners() {
       document.getElementById('searchSuggestions').innerHTML = '';
     });
   }
-    // Toggle Map Controls Button
-    const toggleMapControlsBtn = document.getElementById('toggleMapControlsBtn');
-    const mapControls = document.getElementById('map-controls');
-  
-    if (toggleMapControlsBtn && mapControls) {
-      toggleMapControlsBtn.addEventListener('click', () => {
-        mapControls.classList.toggle('show'); // Toggle the 'show' class to control visibility
-      });
-    }
+
+  // Toggle Map Controls Button
+  const toggleMapControlsBtn = document.getElementById('toggleMapControlsBtn');
+  const mapControls = document.getElementById('map-controls');
+
+  if (toggleMapControlsBtn && mapControls) {
+    toggleMapControlsBtn.addEventListener('click', () => {
+      mapControls.classList.toggle('show'); // Toggle the 'show' class to control visibility
+    });
+  }
 
   // Export to GPX Button
   const exportToGPXBtn = document.getElementById('exportToGPXBtn');
@@ -1113,7 +1136,7 @@ function animateStatUpdate(elementId, newValue) {
   }
 }
 
-// Animate an element with a given animation class
+// Animate an element with a given animation class (continued)
 function animateElement(element, animationClass) {
   element.classList.add('animate__animated', animationClass);
   setTimeout(() => {
@@ -1235,74 +1258,62 @@ function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
-// Search Controls
-const searchInput = document.getElementById('searchInput');
-const searchBtn = document.getElementById('searchBtn');
-if (searchBtn && searchInput) {
-  searchBtn.addEventListener('click', handleBackgroundTask(async () => {
-    const query = searchInput.value;
-    if (!query) {
-      showFeedback('Please enter a location to search for.', 'warning');
-      return;
-    }
+// Initialize the application
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    showFeedback('Initializing application...', 'info');
 
-    try {
-      const data = await fetchJSON(`/search_location?query=${query}`);
-      if (data.error) {
-        throw new Error(data.error);
-      } else {
-        const { latitude, longitude, address } = data;
-        map.setView([latitude, longitude], 13);
-        removeLayer(searchMarker);
-        searchMarker = createAnimatedMarker([latitude, longitude], { icon: RED_MARKER_ICON })
-          .addTo(map)
-          .bindPopup(`<b>${address}</b>`)
-          .openPopup();
+    // Initialize the map
+    map = initMap();
 
-        showFeedback(`Found location: ${address}`, 'success');
+    // Initialize layers and controls
+    await Promise.all([
+      initProgressLayer(),
+      initWacoStreetsLayer(),
+      loadHistoricalData().catch(error => {
+        console.error('Historical data loading failed:', error);
+        showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
+      }),
+      loadLiveRouteData().catch(error => {
+        console.error('Live route data loading failed:', error);
+        showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
+      })
+    ]);
 
-        setTimeout(() => removeLayer(searchMarker), 10000);
-      }
-    } catch (error) {
-      throw new Error('Error searching for location: ' + error.message);
-    }
-  }, 'Searching for location...'));
+    // Set up data polling and updates
+    setInterval(updateLiveDataAndMetrics, LIVE_DATA_AND_METRICS_UPDATE_INTERVAL);
+    setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
+    setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
 
-  searchInput.addEventListener('input', debounce(async () => {
-    const query = searchInput.value;
-    const suggestionsContainer = document.getElementById('searchSuggestions');
-    suggestionsContainer.innerHTML = '';
+    // Set up event listeners
+    setupEventListeners();
 
-    if (query.length < 3) {
-      return;
-    }
+    showFeedback('Application initialized successfully', 'success');
+  } catch (error) {
+    console.error('Error initializing application:', error);
+    showFeedback(`Error initializing application: ${error.message}. Some features may be unavailable.`, 'error');
+  } finally {
+    hideLoading(); // Ensure loading screen is hidden regardless of success or failure
+  }
+});
 
-    try {
-      const suggestions = await fetchJSON(`/search_suggestions?query=${query}`);
-      if (suggestions.length > 0) {
-        suggestions.forEach(suggestion => {
-          const suggestionElement = document.createElement('div');
-          suggestionElement.textContent = suggestion.address;
-          suggestionElement.classList.add('animate__animated', 'animate__fadeIn');
-          suggestionElement.addEventListener('click', () => {
-            searchInput.value = suggestion.address;
-            suggestionsContainer.innerHTML = '';
-          });
-          suggestionsContainer.appendChild(suggestionElement);
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching search suggestions:', error);
-    }
-  }, 300));
-
-  searchInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      document.getElementById('searchSuggestions').innerHTML = '';
-    }
-  });
-
-  searchBtn.addEventListener('click', () => {
-    document.getElementById('searchSuggestions').innerHTML = '';
-  });
-}
+window.mapApp = {
+  map,
+  initMap,
+  loadHistoricalData,
+  loadLiveRouteData,
+  updateLiveDataAndMetrics,
+  updateProgress,
+  loadProgressData,
+  displayHistoricalData,
+  clearLiveRoute,
+  exportToGPX,
+  filterRoutesBy,
+  clearDrawnShapes,
+  togglePlayPause,
+  stopPlayback,
+  adjustPlaybackSpeed,
+  showFeedback,
+  showLoading,
+  hideLoading
+};

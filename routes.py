@@ -3,7 +3,9 @@ from datetime import datetime, date, timezone
 import json
 import logging
 
-from quart import jsonify, redirect, render_template, request, session, url_for, Response
+from quart import jsonify, redirect, render_template, request, session, url_for, Response, websocket
+from quart_cors import cors
+from cachetools import TTLCache
 
 from bouncie import BouncieAPI
 from config import Config
@@ -20,6 +22,9 @@ config = Config()
 
 bouncie_api = BouncieAPI()
 gpx_exporter = GPXExporter(None)  # We'll set this properly in register_routes
+
+# Initialize cache
+cache = TTLCache(maxsize=100, ttl=3600)
 
 def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer
@@ -42,6 +47,84 @@ def register_routes(app):
             except Exception as e:
                 logging.error(f"Error in get_progress: {str(e)}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
+
+    @app.route("/filtered_historical_data")
+    async def get_filtered_historical_data():
+        try:
+            params = HistoricalDataParams(
+                date_range=DateRange(
+                    start_date=request.args.get("startDate") or "2020-01-01",
+                    end_date=request.args.get("endDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                ),
+                filter_waco=request.args.get("filterWaco", "false").lower() == "true",
+                waco_boundary=request.args.get("wacoBoundary", "city_limits"),
+                bounds=[float(x) for x in request.args.get("bounds", "").split(",")] if request.args.get("bounds") else None
+            )
+
+            logger.info(f"Received request for filtered historical data: {params}")
+
+            waco_limits = None
+            if params.filter_waco and params.waco_boundary != "none":
+                waco_limits = await geojson_handler.load_waco_boundary(params.waco_boundary)
+
+            filtered_features = await geojson_handler.filter_geojson_features(
+                params.date_range.start_date.isoformat(),
+                params.date_range.end_date.isoformat(),
+                params.filter_waco,
+                waco_limits,
+                bounds=params.bounds
+            )
+
+            result = {
+                "type": "FeatureCollection",
+                "features": filtered_features,
+                "total_features": len(filtered_features)
+            }
+
+            return jsonify(result)
+
+        except ValueError as e:
+            logger.error(f"Error parsing parameters: {str(e)}")
+            return jsonify({"error": f"Invalid parameter: {str(e)}"}), 400
+        except Exception as e:
+            logger.error(f"Error filtering historical data: {str(e)}", exc_info=True)
+            return jsonify({"error": f"Error filtering historical data: {str(e)}"}), 500
+
+    @app.route('/waco_streets')
+    async def get_waco_streets():
+        try:
+            waco_boundary = request.args.get("wacoBoundary", "city_limits")
+            streets_filter = request.args.get("filter", "all")
+            cache_key = f"waco_streets_{waco_boundary}_{streets_filter}"
+            
+            if cache_key in cache:
+                return jsonify(cache[cache_key])
+            
+            logging.info(f"Fetching Waco streets: boundary={waco_boundary}, filter={streets_filter}")
+            streets_geojson = await geojson_handler.get_waco_streets(waco_boundary, streets_filter)
+            streets_data = json.loads(streets_geojson)
+            
+            if 'features' not in streets_data:
+                raise ValueError("Invalid GeoJSON: 'features' key not found")
+            
+            cache[cache_key] = streets_data
+            logging.info(f"Returning {len(streets_data['features'])} street features")
+            return jsonify(streets_data)
+        except Exception as e:
+            logging.error(f"Error in get_waco_streets: {str(e)}", exc_info=True)
+            return jsonify({"error": str(e)}), 500
+
+    @app.websocket('/ws/live_route')
+    async def ws_live_route():
+        try:
+            while True:
+                async with app.live_route_lock:
+                    data = app.live_route_data
+                await websocket.send(json.dumps(data))
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            # Handle WebSocket disconnection
+            pass
 
     @app.route("/update_progress", methods=["POST"])
     async def update_progress():
@@ -80,92 +163,6 @@ def register_routes(app):
                 "loaded": app.historical_data_loaded,
                 "loading": app.historical_data_loading
             })
-
-    @app.route("/historical_data")
-    async def get_historical_data():
-        async with app.historical_data_lock:
-            try:
-                params = HistoricalDataParams(
-                    date_range=DateRange(
-                        start_date=request.args.get("startDate") or "2020-01-01",
-                        end_date=request.args.get("endDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                    ),
-                    filter_waco=request.args.get("filterWaco", "false").lower() == "true",
-                    waco_boundary=request.args.get("wacoBoundary", "city_limits"),
-                    bounds=[float(x) for x in request.args.get("bounds", "").split(",")] if request.args.get("bounds") else None
-                )
-
-                logger.info(f"Received request for historical data: {params}")
-
-                waco_limits = None
-                if params.filter_waco and params.waco_boundary != "none":
-                    waco_limits = await geojson_handler.load_waco_boundary(params.waco_boundary)
-
-                filtered_features = await geojson_handler.filter_geojson_features(
-                    params.date_range.start_date.isoformat(),
-                    params.date_range.end_date.isoformat(),
-                    params.filter_waco,
-                    waco_limits,
-                    bounds=params.bounds
-                )
-
-                result = {
-                    "type": "FeatureCollection",
-                    "features": filtered_features,
-                    "total_features": len(filtered_features)
-                }
-
-                return jsonify(result)
-
-            except ValueError as e:
-                logger.error(f"Error parsing parameters: {str(e)}")
-                return jsonify({"error": f"Invalid parameter: {str(e)}"}), 400
-            except Exception as e:
-                logger.error(f"Error filtering historical data: {str(e)}", exc_info=True)
-                return jsonify({"error": f"Error filtering historical data: {str(e)}"}), 500
-
-    @app.route("/live_data")
-    async def get_live_data():
-        try:
-            bouncie_data = await bouncie_api.get_latest_bouncie_data()
-            if bouncie_data:
-                new_point = {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [bouncie_data["longitude"], bouncie_data["latitude"]],
-                    },
-                    "properties": {"timestamp": bouncie_data["timestamp"]},
-                }
-                async with app.live_route_lock:
-                    if not app.live_route_data or 'features' not in app.live_route_data or not app.live_route_data['features']:
-                        app.live_route_data = {"type": "FeatureCollection", "features": []}
-
-                    if not app.live_route_data["features"]:
-                        app.live_route_data["features"].append({
-                            "type": "Feature",
-                            "geometry": {
-                                "type": "LineString",
-                                "coordinates": []
-                            },
-                            "properties": {}
-                        })
-
-                    live_route_feature = app.live_route_data["features"][0]
-
-                    new_coord = [bouncie_data["longitude"], bouncie_data["latitude"]]
-
-                    if not live_route_feature["geometry"]["coordinates"] or new_coord != live_route_feature["geometry"]["coordinates"][-1]:
-                        live_route_feature["geometry"]["coordinates"].append(new_coord)
-                        app.latest_bouncie_data = bouncie_data
-                    else:
-                        logger.debug("Duplicate point detected, not adding to live route")
-
-                return jsonify(bouncie_data)
-            return jsonify({"error": "No live data available"})
-        except Exception as e:
-            logger.error(f"An error occurred while fetching live data: {e}")
-            return jsonify({"error": str(e)}), 500
 
     @app.route("/trip_metrics")
     async def get_trip_metrics():
@@ -265,22 +262,6 @@ def register_routes(app):
         async with app.processing_lock:
             return jsonify({'isProcessing': app.is_processing})
 
-    @app.route('/waco_streets')
-    async def get_waco_streets():
-        try:
-            waco_boundary = request.args.get("wacoBoundary", "city_limits")
-            streets_filter = request.args.get("filter", "all")
-            logging.info(f"Fetching Waco streets: boundary={waco_boundary}, filter={streets_filter}")
-            streets_geojson = await geojson_handler.get_waco_streets(waco_boundary, streets_filter)
-            streets_data = json.loads(streets_geojson)
-            if 'features' not in streets_data:
-                raise ValueError("Invalid GeoJSON: 'features' key not found")
-            logging.info(f"Returning {len(streets_data['features'])} street features")
-            return jsonify(streets_data)
-        except Exception as e:
-            logging.error(f"Error in get_waco_streets: {str(e)}", exc_info=True)
-            return jsonify({"error": str(e)}), 500
-
     @app.route("/reset_progress", methods=["POST"])
     @login_required
     async def reset_progress():
@@ -293,7 +274,7 @@ def register_routes(app):
                 logger.info("Starting progress reset process")
 
                 # Reset the progress in the WacoStreetsAnalyzer
-                waco_analyzer.reset_progress()
+                await waco_analyzer.reset_progress()
 
                 # Recalculate the progress using all historical data
                 await geojson_handler.update_all_progress()
@@ -371,8 +352,7 @@ def register_routes(app):
                 await bouncie_api.client.client_session.close()
                 logger.info("Bouncie API client session closed")
 
-            if geojson_handler.bouncie_api.client and geojson_handler.bouncie_api.client.client_session:
-                await geojson_handler.bouncie_api.client.client_session.close()
+            if geojson_handler.bouncie_api.client and geojson_handler.bouncie_api.client.client_session.close()
                 logger.info("GeoJSON handler Bouncie API client session closed")
 
         except Exception as e:

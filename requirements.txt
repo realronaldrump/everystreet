@@ -19,3 +19,5 @@ tenacity
 pydantic
 httpx
 pydantic-settings
+cachetools
+websockets

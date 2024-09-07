@@ -55,108 +55,116 @@ let liveDataFetchController = null; // AbortController for live data requests
 const processingQueue = [];
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    showFeedback('Initializing application...', 'info');
-
-    // Initialize the map
-    map = initMap();
-
-    // Initialize layers and controls
-    await Promise.all([
-      initProgressLayer(),
-      initWacoStreetsLayer(),
-      loadHistoricalData().catch(error => {
-        console.error('Historical data loading failed:', error);
-        showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
-      }),
-      loadLiveRouteData().catch(error => {
-        console.error('Live route data loading failed:', error);
-        showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
-      })
-    ]);
-
-    // Set up data polling and updates
-    setInterval(updateLiveDataAndMetrics, LIVE_DATA_AND_METRICS_UPDATE_INTERVAL);
-    setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
-    setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
-
-    // Set up event listeners
-    setupEventListeners();
-
-    showFeedback('Application initialized successfully', 'success');
-  } catch (error) {
+document.addEventListener('DOMContentLoaded', () => {
+  initializeApp().catch(error => {
     console.error('Error initializing application:', error);
     showFeedback(`Error initializing application: ${error.message}. Some features may be unavailable.`, 'error');
-  } finally {
-    hideLoading(); // Ensure loading screen is hidden regardless of success or failure
-  }
+  }).finally(() => {
+    hideLoading();
+  });
 });
+
+async function initializeApp() {
+  showFeedback('Initializing application...', 'info');
+
+  // Initialize the map
+  map = initMap();
+
+  // Initialize layers and controls sequentially
+  await initWacoLimitsLayer();
+  await initProgressLayer();
+  await initWacoStreetsLayer();
+
+  try {
+    await loadHistoricalData();
+  } catch (error) {
+    console.error('Historical data loading failed:', error);
+    showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
+  }
+
+  try {
+    await loadLiveRouteData();
+  } catch (error) {
+    console.error('Live route data loading failed:', error);
+    showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
+  }
+
+  // Set up data polling and updates
+  setInterval(updateLiveDataAndMetrics, LIVE_DATA_AND_METRICS_UPDATE_INTERVAL);
+  setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
+  setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
+
+  // Set up event listeners
+  setupEventListeners();
+
+  showFeedback('Application initialized successfully', 'success');
+}
 
 // Initialize the Leaflet map
 function initMap() {
-  try {
-    if (map) {
-      map.remove(); // Remove existing map if it exists
-    }
-    map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19
-    }).addTo(map);
-
-    // Create map panes with correct z-index order
-    map.createPane('wacoLimitsPane').style.zIndex = 400;
-    map.createPane('progressPane').style.zIndex = 410;
-    map.createPane('historicalDataPane').style.zIndex = 430;
-    map.createPane('wacoStreetsPane').style.zIndex = 440;
-
-    // Add progress controls
-    const progressControl = L.control({ position: 'bottomleft' });
-    progressControl.onAdd = () => {
-      const div = L.DomUtil.create('div', 'progress-control');
-      div.innerHTML = '<div id="progress-bar-container"><div id="progress-bar"></div></div><div id="progress-text"></div>';
-      return div;
-    };
-    progressControl.addTo(map);
-
-    // Initialize drawing tools
-    drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    const drawControl = new L.Control.Draw({
-      draw: {
-        polyline: false,
-        polygon: true,
-        circle: false,
-        rectangle: false,
-        marker: false,
-        circlemarker: false
-      },
-      edit: {
-        featureGroup: drawnItems
+  return new Promise((resolve, reject) => {
+    try {
+      if (map) {
+        map.remove();
       }
-    });
-    map.addControl(drawControl);
+      map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
-    // Event listeners for drawing tools
-    map.on(L.Draw.Event.CREATED, (e) => {
-      drawnItems.addLayer(e.layer);
-      filterHistoricalDataByPolygon(e.layer);
-    });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+      }).addTo(map);
 
-    map.on(L.Draw.Event.EDITED, (e) => {
-      e.layers.eachLayer(filterHistoricalDataByPolygon);
-    });
+      // Create map panes with correct z-index order
+      map.createPane('wacoLimitsPane').style.zIndex = 400;
+      map.createPane('progressPane').style.zIndex = 410;
+      map.createPane('historicalDataPane').style.zIndex = 430;
+      map.createPane('wacoStreetsPane').style.zIndex = 440;
 
-    map.on(L.Draw.Event.DELETED, displayHistoricalData);
+      // Add progress controls
+      const progressControl = L.control({ position: 'bottomleft' });
+      progressControl.onAdd = () => {
+        const div = L.DomUtil.create('div', 'progress-control');
+        div.innerHTML = '<div id="progress-bar-container"><div id="progress-bar"></div></div><div id="progress-text"></div>';
+        return div;
+      };
+      progressControl.addTo(map);
 
-    showFeedback('Map initialized successfully', 'success');
-    return map;
-  } catch (error) {
-    handleError(error, 'initializing map');
-    throw error; // Re-throw to allow for further handling if needed
-  }
+      // Initialize drawing tools
+      drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
+
+      const drawControl = new L.Control.Draw({
+        draw: {
+          polyline: false,
+          polygon: true,
+          circle: false,
+          rectangle: false,
+          marker: false,
+          circlemarker: false
+        },
+        edit: {
+          featureGroup: drawnItems
+        }
+      });
+      map.addControl(drawControl);
+
+      // Event listeners for drawing tools
+      map.on(L.Draw.Event.CREATED, (e) => {
+        drawnItems.addLayer(e.layer);
+        filterHistoricalDataByPolygon(e.layer);
+      });
+
+      map.on(L.Draw.Event.EDITED, (e) => {
+        e.layers.eachLayer(filterHistoricalDataByPolygon);
+      });
+
+      map.on(L.Draw.Event.DELETED, displayHistoricalData);
+
+      showFeedback('Map initialized successfully', 'success');
+      resolve(map);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 // Initialize the Waco city limits layer
@@ -164,21 +172,21 @@ async function initWacoLimitsLayer() {
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
 
-    // Remove existing layer if it exists
     if (wacoLimitsLayer && map.hasLayer(wacoLimitsLayer)) {
       map.removeLayer(wacoLimitsLayer);
     }
 
-    wacoLimitsLayer = L.geoJSON(await fetchGeoJSON(`/static/${wacoBoundary}.geojson`), {
+    const geoJSONData = await fetchGeoJSON(`/static/${wacoBoundary}.geojson`);
+    wacoLimitsLayer = L.geoJSON(geoJSONData, {
       style: {
         color: 'red',
         weight: 2,
         fillColor: 'orange',
-        fillOpacity: 0.03 // Ensure the correct opacity
+        fillOpacity: 0.03
       },
       pane: 'wacoLimitsPane'
     });
-    updateWacoLimitsLayerVisibility(); 
+    updateWacoLimitsLayerVisibility();
   } catch (error) {
     console.error('Error initializing Waco limits layer:', error);
     showFeedback('Error loading Waco limits. Some features may be unavailable.', 'error');
@@ -199,7 +207,8 @@ function updateWacoLimitsLayerVisibility() {
 // Initialize the progress layer
 async function initProgressLayer() {
   try {
-    progressLayer = L.geoJSON(await fetchGeoJSON(`/progress_geojson?wacoBoundary=${DEFAULT_WACO_BOUNDARY}`), {
+    const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${DEFAULT_WACO_BOUNDARY}`);
+    progressLayer = L.geoJSON(data, {
       style: (feature) => ({
         color: feature.properties.traveled ? '#00ff00' : '#ff0000',
         weight: 3,
@@ -242,25 +251,25 @@ async function initWacoStreetsLayer() {
       pane: 'wacoStreetsPane',
       onEachFeature: (feature, layer) => {
         if (feature.properties && feature.properties.name) {
-          layer.bindPopup(feature.properties.name); // Bind the popup here
+          layer.bindPopup(feature.properties.name);
         }
 
         layer.on('mouseover', function() {
           this.setStyle({
-            color: '#FFFF00', // Highlight color (e.g., yellow)
+            color: '#FFFF00',
             weight: 5
           });
         });
 
         layer.on('mouseout', function() {
           this.setStyle({
-            color: '#808080', // Revert to original color
+            color: '#808080',
             weight: 1
           });
         });
 
         layer.on('click', function() {
-          this.openPopup(); // Open the popup on click
+          this.openPopup();
         });
       }
     });

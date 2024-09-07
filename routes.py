@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 config = Config()
 
 # Removed BouncieAPI instance creation here
-gpx_exporter = GPXExporter(None)  # We'll set this properly in register_routes
+gpx_exporter = GPXExporter(None)
 
 # Initialize cache
 cache = TTLCache(maxsize=100, ttl=3600)
@@ -28,8 +28,8 @@ cache = TTLCache(maxsize=100, ttl=3600)
 def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer
     geojson_handler = app.geojson_handler
-    bouncie_api = app.bouncie_api  # Get the BouncieAPI instance from app
-    gpx_exporter.geojson_handler = geojson_handler
+    bouncie_api = app.bouncie_api
+    gpx_exporter = GPXExporter(geojson_handler)
 
     @app.route('/progress')
     async def get_progress():
@@ -331,7 +331,6 @@ def register_routes(app):
             logger.info("Historical data initialized without progress update.")
 
             if not hasattr(app, 'background_tasks_started'):
-                # Pass the single BouncieAPI instance to the task
                 app.task_manager.add_task(poll_bouncie_api(app, bouncie_api))
                 app.background_tasks_started = True
                 logger.debug("Bouncie API polling task added")

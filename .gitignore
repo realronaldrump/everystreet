@@ -47,3 +47,4 @@ favicon.ico
 .vscode
 .vscode/launch.json
 launch.geojson
+static/Waco-Streets-complete.geojson

@@ -5,15 +5,14 @@ import asyncio
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import box
-from bouncie import BouncieAPI
 from .file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
 
 class DataProcessor:
-    def __init__(self, waco_analyzer):
+    def __init__(self, waco_analyzer, bouncie_api):  # Accept bouncie_api as a parameter
         self.waco_analyzer = waco_analyzer
-        self.bouncie_api = BouncieAPI()
+        self.bouncie_api = bouncie_api  # Store the passed bouncie_api instance
         self.file_handler = FileHandler()
         self.concurrency = 100  # Adjust this value based on your needs
 

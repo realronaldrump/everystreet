@@ -11,10 +11,10 @@ from .progress_updater import ProgressUpdater
 logger = logging.getLogger(__name__)
 
 class GeoJSONHandler:
-    def __init__(self, waco_analyzer):
+    def __init__(self, waco_analyzer, bouncie_api):
         self.waco_analyzer = waco_analyzer
         self.data_loader = DataLoader()
-        self.data_processor = DataProcessor(waco_analyzer)
+        self.data_processor = DataProcessor(waco_analyzer, bouncie_api)
         self.progress_updater = ProgressUpdater(waco_analyzer)
         self.historical_geojson_features = []
         self.fetched_trip_timestamps = set()

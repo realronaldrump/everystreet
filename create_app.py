@@ -2,7 +2,7 @@ import asyncio
 from quart import Quart
 from quart_cors import cors
 from config import Config
-from bouncie import BouncieAPI
+from bouncie import BouncieAPI  # Import BouncieAPI
 from geojson import GeoJSONHandler
 from waco_streets_analyzer import WacoStreetsAnalyzer
 from utils import load_live_route_data
@@ -44,13 +44,17 @@ async def create_app():
     app.live_route_lock = asyncio.Lock()
     app.progress_lock = asyncio.Lock()
 
+    # Initialize BouncieAPI (Single Instance)
+    app.bouncie_api = BouncieAPI()
+    logger.info("BouncieAPI initialized successfully")
+
     # Initialize WacoStreetsAnalyzer
     app.waco_streets_analyzer = WacoStreetsAnalyzer('static/Waco-Streets.geojson')
     await app.waco_streets_analyzer.initialize()
     logger.info("WacoStreetsAnalyzer initialized successfully")
     
     # Initialize GeoJSONHandler
-    app.geojson_handler = GeoJSONHandler(app.waco_streets_analyzer)
+    app.geojson_handler = GeoJSONHandler(app.waco_streets_analyzer, app.bouncie_api)  # Pass bouncie_api
     await app.geojson_handler.load_historical_data()
     logger.info("GeoJSONHandler initialized successfully")
 

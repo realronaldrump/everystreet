@@ -7,7 +7,6 @@ from quart import jsonify, redirect, render_template, request, session, url_for,
 from quart_cors import cors
 from cachetools import TTLCache
 
-from bouncie import BouncieAPI
 from config import Config
 from date_utils import format_date, timedelta
 from geojson.geojson_handler import GeoJSONHandler
@@ -20,7 +19,7 @@ from tasks import load_historical_data_background, poll_bouncie_api
 logger = logging.getLogger(__name__)
 config = Config()
 
-bouncie_api = BouncieAPI()
+# Removed BouncieAPI instance creation here
 gpx_exporter = GPXExporter(None)  # We'll set this properly in register_routes
 
 # Initialize cache
@@ -29,6 +28,7 @@ cache = TTLCache(maxsize=100, ttl=3600)
 def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer
     geojson_handler = app.geojson_handler
+    bouncie_api = app.bouncie_api  # Get the BouncieAPI instance from app
     gpx_exporter.geojson_handler = geojson_handler
 
     @app.route('/progress')
@@ -166,7 +166,7 @@ def register_routes(app):
 
     @app.route("/trip_metrics")
     async def get_trip_metrics():
-        formatted_metrics = await bouncie_api.get_trip_metrics()
+        formatted_metrics = await bouncie_api.get_trip_metrics()  # Use bouncie_api from app
         return jsonify(formatted_metrics)
 
     @app.route("/export_gpx")
@@ -331,7 +331,7 @@ def register_routes(app):
             logger.info("Historical data initialized without progress update.")
 
             if not hasattr(app, 'background_tasks_started'):
-                app.task_manager.add_task(poll_bouncie_api(app))
+                app.task_manager.add_task(poll_bouncie_api(app, bouncie_api))  # Pass bouncie_api to the task
                 app.background_tasks_started = True
                 logger.debug("Bouncie API polling task added")
 

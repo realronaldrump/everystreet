@@ -21,33 +21,15 @@ logger = logging.getLogger(__name__)
 # Create the app synchronously
 app = asyncio.run(create_app())
 
-async def run_app():
-    logger.info("Creating app...")
-    app = await create_app()
-    logger.info("App created successfully")
-
-    logger.info("Registering routes...")
-    from routes import register_routes
-    register_routes(app)
-    logger.info("Routes registered successfully")
-
-    config_local = HyperConfig()
-    config_local.bind = ["0.0.0.0:8080"]
-    config_local.workers = 1
-    config_local.startup_timeout = 3600
-    logger.info("Starting Hypercorn server...")
-    try:
-        await serve(app, config_local)
-    except Exception as e:
-        logger.error(f"Error starting Hypercorn server: {str(e)}", exc_info=True)
-        raise
-    finally:
-        await app.shutdown()
-
 if __name__ == "__main__":
     logger.info("Starting application...")
     config_local = HyperConfig()
-    config_local.bind = ["0.0.0.0:$PORT"]  # Use environment variable for PORT
+
+    if os.environ.get('PORT'):  # Check if running on Railway (PORT is set)
+        config_local.bind = ["0.0.0.0:$PORT"]
+    else:  
+        config_local.bind = ["0.0.0.0:8080"]  # Use 8080 for local development
+    
     config_local.workers = 1
     config_local.startup_timeout = 3600
     logger.info("Starting Hypercorn server...")

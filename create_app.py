@@ -5,24 +5,7 @@ from config import Config
 from bouncie import BouncieAPI  # Import BouncieAPI
 from geojson import GeoJSONHandler
 from waco_streets_analyzer import WacoStreetsAnalyzer
-from utils import load_live_route_data
-from utils import logger
-
-class TaskManager:
-    def __init__(self):
-        self.tasks = set()
-
-    def add_task(self, coro):
-        task = asyncio.create_task(coro)
-        self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
-
-    async def cancel_all(self):
-        tasks = list(self.tasks)
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        self.tasks.clear()
+from utils import load_live_route_data, TaskManager, logger
 
 async def create_app():
     app = cors(Quart(__name__))
@@ -53,8 +36,8 @@ async def create_app():
     await app.waco_streets_analyzer.initialize()
     logger.info("WacoStreetsAnalyzer initialized successfully")
     
-    # Initialize GeoJSONHandler
-    app.geojson_handler = GeoJSONHandler(app.waco_streets_analyzer, app.bouncie_api)  # Pass bouncie_api
+    # Initialize GeoJSONHandler (Pass the single BouncieAPI instance)
+    app.geojson_handler = GeoJSONHandler(app.waco_streets_analyzer, app.bouncie_api)
     await app.geojson_handler.load_historical_data()
     logger.info("GeoJSONHandler initialized successfully")
 

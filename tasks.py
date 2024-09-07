@@ -4,26 +4,10 @@ from utils import save_live_route_data
 
 logger = logging.getLogger(__name__)
 
-class TaskManager:
-    def __init__(self):
-        self.tasks = set()
-
-    def add_task(self, coro):
-        task = asyncio.create_task(coro)
-        self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
-
-    async def cancel_all(self):
-        tasks = list(self.tasks)
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        self.tasks.clear()
-
-async def poll_bouncie_api(app, bouncie_api):  # Accept bouncie_api as a parameter
+async def poll_bouncie_api(app, bouncie_api):
     while True:
         try:
-            bouncie_data = await bouncie_api.get_latest_bouncie_data()  # Use the passed bouncie_api instance
+            bouncie_data = await bouncie_api.get_latest_bouncie_data()
             if bouncie_data:
                 async with app.live_route_lock:
                     if "features" not in app.live_route_data:

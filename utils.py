@@ -4,6 +4,7 @@ from functools import wraps
 from geopy.geocoders import Nominatim
 from quart import redirect, url_for, session
 from logging.handlers import RotatingFileHandler
+import asyncio
 
 # Live Route Data File
 LIVE_ROUTE_DATA_FILE = "live_route_data.geojson"
@@ -47,3 +48,19 @@ def setup_logging(log_file):
     )
 
 geolocator = Nominatim(user_agent="bouncie_viewer", timeout=10)
+
+class TaskManager:
+    def __init__(self):
+        self.tasks = set()
+
+    def add_task(self, coro):
+        task = asyncio.create_task(coro)
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
+
+    async def cancel_all(self):
+        tasks = list(self.tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self.tasks.clear()

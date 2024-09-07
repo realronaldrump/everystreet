@@ -12,7 +12,7 @@ from date_utils import format_date, timedelta
 from geojson.geojson_handler import GeoJSONHandler
 from gpx_exporter import GPXExporter
 from models import DateRange, HistoricalDataParams
-from utils import login_required, geolocator
+from utils import login_required, geolocator, TaskManager
 from waco_streets_analyzer import WacoStreetsAnalyzer
 from tasks import load_historical_data_background, poll_bouncie_api
 
@@ -331,7 +331,8 @@ def register_routes(app):
             logger.info("Historical data initialized without progress update.")
 
             if not hasattr(app, 'background_tasks_started'):
-                app.task_manager.add_task(poll_bouncie_api(app, bouncie_api))  # Pass bouncie_api to the task
+                # Pass the single BouncieAPI instance to the task
+                app.task_manager.add_task(poll_bouncie_api(app, bouncie_api))
                 app.background_tasks_started = True
                 logger.debug("Bouncie API polling task added")
 

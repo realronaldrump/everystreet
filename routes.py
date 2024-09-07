@@ -287,6 +287,38 @@ def register_routes(app):
             finally:
                 app.is_processing = False
 
+    @app.route("/historical_data")
+    async def get_historical_data():
+        try:
+            start_date = request.args.get("startDate")
+            end_date = request.args.get("endDate")
+            filter_waco = request.args.get("filterWaco", "false").lower() == "true"
+            waco_boundary = request.args.get("wacoBoundary", "city_limits")
+
+            logger.info(f"Fetching historical data for: {start_date} to {end_date}, filterWaco: {filter_waco}, wacoBoundary: {waco_boundary}")
+
+            waco_limits = None
+            if filter_waco:
+                waco_limits = geojson_handler.load_waco_boundary(waco_boundary)
+
+            filtered_features = geojson_handler.filter_geojson_features(
+                start_date, end_date, filter_waco, waco_limits
+            )
+
+            return jsonify({
+                "type": "FeatureCollection",
+                "features": filtered_features
+            })
+        except Exception as e:
+            logger.error(f"Error fetching historical data: {str(e)}", exc_info=True)
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/live_data")
+    async def get_live_data():
+        async with app.live_route_lock:
+            latest_data = getattr(app, 'latest_bouncie_data', {})
+            return jsonify(latest_data)
+
     @app.route("/login", methods=["GET", "POST"])
     async def login():
         if request.method == "POST":

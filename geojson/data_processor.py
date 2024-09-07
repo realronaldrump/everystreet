@@ -6,6 +6,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import box
 from .file_handler import FileHandler
+from date_utils import get_start_of_day, get_end_of_day, days_ago, format_date  # Import from date_utils
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +119,9 @@ class DataProcessor:
             raise
 
     async def filter_features(self, handler, start_date, end_date, filter_waco, waco_limits, bounds=None):
-        start_datetime = self._get_start_of_day(start_date)
-        end_datetime = self._get_end_of_day(end_date)
+        # Use get_start_of_day and get_end_of_day from date_utils
+        start_datetime = get_start_of_day(start_date)
+        end_datetime = get_end_of_day(end_date)
 
         logger.info(f"Filtering features from {start_datetime} to {end_datetime}, filter_waco={filter_waco}")
 
@@ -177,11 +179,12 @@ class DataProcessor:
 
     async def get_recent_data(self, handler):
         try:
-            yesterday = self._days_ago(1)
+            # Use days_ago and format_date from date_utils
+            yesterday = days_ago(1)
             filtered_features = await self.filter_features(
                 handler,
-                self._format_date(yesterday),
-                self._format_date(datetime.now(timezone.utc)),
+                format_date(yesterday),
+                format_date(datetime.now(timezone.utc)),
                 filter_waco=False,
                 waco_limits=None,
             )
@@ -210,23 +213,3 @@ class DataProcessor:
         except Exception as e:
             logger.error(f"Error in get_waco_streets: {str(e)}", exc_info=True)
             return json.dumps({"error": str(e)})
-
-    @staticmethod
-    def _get_start_of_day(date):
-        if isinstance(date, str):
-            date = datetime.fromisoformat(date.replace('Z', '+00:00'))
-        return date.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
-
-    @staticmethod
-    def _get_end_of_day(date):
-        if isinstance(date, str):
-            date = datetime.fromisoformat(date.replace('Z', '+00:00'))
-        return date.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
-
-    @staticmethod
-    def _days_ago(num_days):
-        return datetime.now(timezone.utc) - timedelta(days=num_days)
-
-    @staticmethod
-    def _format_date(date):
-        return date.isoformat()

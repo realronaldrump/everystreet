@@ -226,28 +226,43 @@ function updateProgressLayerVisibility() {
 // Initialize the Waco streets layer
 async function initWacoStreetsLayer() {
   try {
-    wacoStreetsLayer = L.geoJSON(await fetchGeoJSON('/static/waco-streets.geojson'), {
+    const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+    const streetsFilter = document.getElementById('streets-select').value;
+    const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
+    if (wacoStreetsLayer && map) {
+      map.removeLayer(wacoStreetsLayer);
+    }
+    wacoStreetsLayer = L.geoJSON(data, {
       style: {
         color: '#808080',
         weight: 1,
-        opacity: DEFAULT_WACO_STREETS_OPACITY
+        opacity: 0.7
       },
-      pane: 'wacoStreetsPane'
+      pane: 'wacoStreetsPane',
+      onEachFeature: (feature, layer) => {
+        layer.on('mouseover', function() {
+          this.setStyle({
+            color: '#FFFF00', // Highlight color (e.g., yellow)
+            weight: 5
+          });
+          if (feature.properties.name) {
+            layer.bindPopup(feature.properties.name).openPopup(); // Show street name popup
+          }
+        });
+        layer.on('mouseout', function() {
+          this.setStyle({
+            color: '#808080', // Revert to original color
+            weight: 1
+          });
+          layer.closePopup(); // Close the popup
+        });
+      }
     });
     updateWacoStreetsLayerVisibility();
+    showFeedback('Waco streets displayed', 'success');
   } catch (error) {
     console.error('Error initializing Waco streets layer:', error);
     showFeedback('Error loading Waco streets. Some features may be unavailable.', 'error');
-  }
-}
-
-// Update the visibility of the Waco streets layer based on checkbox state
-function updateWacoStreetsLayerVisibility() {
-  const showWacoStreets = document.getElementById('wacoStreetsCheckbox').checked;
-  if (showWacoStreets && map && !map.hasLayer(wacoStreetsLayer)) {
-    wacoStreetsLayer.addTo(map);
-  } else if (!showWacoStreets && map && map.hasLayer(wacoStreetsLayer)) {
-    map.removeLayer(wacoStreetsLayer);
   }
 }
 

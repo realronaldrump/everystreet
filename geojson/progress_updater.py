@@ -11,15 +11,20 @@ class ProgressUpdater:
             logger.info("Updating progress for all historical data...")
             total_features = len(handler.historical_geojson_features)
             logger.info(f"Total features to process: {total_features}")
-
+            
             await self.waco_analyzer.update_progress(handler.historical_geojson_features)
-
             final_coverage = self.waco_analyzer.calculate_progress()
+            
             logger.info(f"Progress updated successfully. Coverage: {final_coverage['coverage_percentage']:.2f}%")
+            logger.info(f"Streets: {final_coverage['traveled_streets']} / {final_coverage['total_streets']}")
+            logger.info(f"Segments: {final_coverage['traveled_segments']} / {final_coverage['total_segments']}")
+            
             return {
                 'coverage_percentage': final_coverage['coverage_percentage'],
                 'total_streets': final_coverage['total_streets'],
-                'traveled_streets': final_coverage['traveled_streets']
+                'traveled_streets': final_coverage['traveled_streets'],
+                'total_segments': final_coverage['total_segments'],
+                'traveled_segments': final_coverage['traveled_segments']
             }
         except Exception as e:
             logger.error(f"Error updating progress: {str(e)}", exc_info=True)

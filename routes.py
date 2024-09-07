@@ -99,7 +99,7 @@ def register_routes(app):
 
                 waco_limits = None
                 if params.filter_waco and params.waco_boundary != "none":
-                    waco_limits = geojson_handler.load_waco_boundary(params.waco_boundary)
+                    waco_limits = await geojson_handler.load_waco_boundary(params.waco_boundary)
 
                 filtered_features = await geojson_handler.filter_geojson_features(
                     params.date_range.start_date.isoformat(),

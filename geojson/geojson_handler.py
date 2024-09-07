@@ -2,6 +2,8 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 import json
+import asyncio
+
 from .data_loader import DataLoader
 from .data_processor import DataProcessor
 from .progress_updater import ProgressUpdater
@@ -34,17 +36,18 @@ class GeoJSONHandler:
     def get_progress(self):
         return self.waco_analyzer.calculate_progress()
 
-    def get_progress_geojson(self, waco_boundary='city_limits'):
-        return self.waco_analyzer.get_progress_geojson(waco_boundary)
+    async def get_progress_geojson(self, waco_boundary):
+        return await self.waco_analyzer.get_progress_geojson(waco_boundary)
 
     async def get_recent_historical_data(self):
         return await self.data_processor.get_recent_data(self)
 
-    def get_waco_streets(self, waco_boundary, streets_filter='all'):
-        return self.data_processor.get_streets(self, waco_boundary, streets_filter)
+    async def get_waco_streets(self, waco_boundary, streets_filter='all'):
+        return await self.data_processor.get_streets(self, waco_boundary, streets_filter)
 
-    def get_untraveled_streets(self, waco_boundary):
-        return self.waco_analyzer.get_untraveled_streets(waco_boundary).to_json()
+    async def get_untraveled_streets(self, waco_boundary):
+        untraveled_streets = await self.waco_analyzer.get_untraveled_streets(waco_boundary)
+        return untraveled_streets.to_json()
 
     async def update_waco_streets_progress(self):
         return await self.progress_updater.update_streets_progress(self)
@@ -53,7 +56,7 @@ class GeoJSONHandler:
         logger.info(f"Retrieving all routes. Total features: {len(self.historical_geojson_features)}")
         return self.historical_geojson_features
 
-    def load_waco_boundary(self, boundary_type):
+    async def load_waco_boundary(self, boundary_type):
         """Loads the GeoJSON data for the specified Waco boundary type."""
         try:
             if boundary_type == "city_limits":
@@ -66,9 +69,12 @@ class GeoJSONHandler:
                 logger.warning(f"Unknown Waco boundary type: {boundary_type}")
                 return None
 
-            with open(file_path, 'r') as f:
-                return json.load(f)
-
+            return await asyncio.to_thread(self._read_json_file, file_path)
         except Exception as e:
             logger.error(f"Error loading Waco boundary: {e}")
             return None
+
+    @staticmethod
+    def _read_json_file(file_path):
+        with open(file_path, 'r') as f:
+            return json.load(f)

@@ -191,10 +191,14 @@ class DataProcessor:
             logger.error(f"Error in get_recent_historical_data: {str(e)}", exc_info=True)
             return []
 
-    def get_streets(self, handler, waco_boundary, streets_filter='all'):
+    async def get_streets(self, handler, waco_boundary, streets_filter='all'):
         try:
             logger.info(f"Getting Waco streets: boundary={waco_boundary}, filter={streets_filter}")
-            street_network = self.waco_analyzer.get_street_network(waco_boundary)
+            street_network = await self.waco_analyzer.get_street_network(waco_boundary)
+            if street_network is None:
+                logger.error("Failed to get street network")
+                return json.dumps({"error": "Failed to get street network"})
+
             logger.info(f"Total streets before filtering: {len(street_network)}")
 
             if streets_filter == 'traveled':
@@ -206,7 +210,7 @@ class DataProcessor:
             return street_network.to_json()
         except Exception as e:
             logger.error(f"Error in get_waco_streets: {str(e)}", exc_info=True)
-            raise
+            return json.dumps({"error": str(e)})
 
     @staticmethod
     def _get_start_of_day(date):

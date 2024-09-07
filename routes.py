@@ -18,12 +18,14 @@ from tasks import load_historical_data_background, poll_bouncie_api
 logger = logging.getLogger(__name__)
 config = Config()
 
-waco_analyzer = WacoStreetsAnalyzer('static/Waco-Streets.geojson')
-geojson_handler = GeoJSONHandler(waco_analyzer)
 bouncie_api = BouncieAPI()
-gpx_exporter = GPXExporter(geojson_handler)
+gpx_exporter = GPXExporter(None)  # We'll set this properly in register_routes
 
 def register_routes(app):
+    waco_analyzer = app.waco_streets_analyzer
+    geojson_handler = app.geojson_handler
+    gpx_exporter.geojson_handler = geojson_handler
+
     @app.route('/progress')
     async def get_progress():
         async with app.progress_lock:
@@ -58,7 +60,7 @@ def register_routes(app):
     @app.route('/untraveled_streets')
     async def get_untraveled_streets():
         waco_boundary = request.args.get("wacoBoundary", "city_limits")
-        untraveled_streets = geojson_handler.get_untraveled_streets(waco_boundary)
+        untraveled_streets = await geojson_handler.get_untraveled_streets(waco_boundary)
         return jsonify(json.loads(untraveled_streets))
 
     @app.route("/latest_bouncie_data")
@@ -252,7 +254,7 @@ def register_routes(app):
     async def get_progress_geojson():
         try:
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
-            progress_geojson = geojson_handler.get_progress_geojson(waco_boundary)
+            progress_geojson = await geojson_handler.get_progress_geojson(waco_boundary)
             return jsonify(progress_geojson)
         except Exception as e:
             logger.error(f"Error getting progress GeoJSON: {str(e)}", exc_info=True)
@@ -269,8 +271,10 @@ def register_routes(app):
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
             streets_filter = request.args.get("filter", "all")
             logging.info(f"Fetching Waco streets: boundary={waco_boundary}, filter={streets_filter}")
-            streets_geojson = geojson_handler.get_waco_streets(waco_boundary, streets_filter)
+            streets_geojson = await geojson_handler.get_waco_streets(waco_boundary, streets_filter)
             streets_data = json.loads(streets_geojson)
+            if 'features' not in streets_data:
+                raise ValueError("Invalid GeoJSON: 'features' key not found")
             logging.info(f"Returning {len(streets_data['features'])} street features")
             return jsonify(streets_data)
         except Exception as e:

@@ -44,3 +44,6 @@ test_bouncie_api.py
 print_response.py
 
 favicon.ico
+.vscode
+.vscode/launch.json
+launch.geojson

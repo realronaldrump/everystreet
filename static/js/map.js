@@ -55,57 +55,50 @@ let liveDataFetchController = null; // AbortController for live data requests
 const processingQueue = [];
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', () => {
-  initializeApp().catch(error => {
-    console.error('Error initializing application:', error);
-    showFeedback(`Error initializing application: ${error.message}. Some features may be unavailable.`, 'error');
-  }).finally(() => {
-    hideLoading();
-  });
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    showFeedback('Initializing application...', 'info');
+
+    // Initialize the map
+    map = await initMap();
+
+    // Initialize layers and controls
+    await Promise.all([
+      initWacoLimitsLayer(),
+      initProgressLayer(),
+      initWacoStreetsLayer(),
+      loadHistoricalData().catch(error => {
+        console.error('Historical data loading failed:', error);
+        showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
+      }),
+      loadLiveRouteData().catch(error => {
+        console.error('Live route data loading failed:', error);
+        showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
+      })
+    ]);
+
+    // Set up data polling and updates
+    setInterval(updateLiveDataAndMetrics, LIVE_DATA_AND_METRICS_UPDATE_INTERVAL);
+    setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
+    setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
+
+    // Set up event listeners
+    setupEventListeners();
+
+    showFeedback('Application initialized successfully', 'success');
+  } catch (error) {
+    handleError(error, 'initializing application');
+  } finally {
+    hideLoading(); // Ensure loading screen is hidden regardless of success or failure
+  }
 });
-
-async function initializeApp() {
-  showFeedback('Initializing application...', 'info');
-
-  // Initialize the map
-  map = initMap();
-
-  // Initialize layers and controls sequentially
-  await initWacoLimitsLayer();
-  await initProgressLayer();
-  await initWacoStreetsLayer();
-
-  try {
-    await loadHistoricalData();
-  } catch (error) {
-    console.error('Historical data loading failed:', error);
-    showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
-  }
-
-  try {
-    await loadLiveRouteData();
-  } catch (error) {
-    console.error('Live route data loading failed:', error);
-    showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
-  }
-
-  // Set up data polling and updates
-  setInterval(updateLiveDataAndMetrics, LIVE_DATA_AND_METRICS_UPDATE_INTERVAL);
-  setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
-  setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
-
-  // Set up event listeners
-  setupEventListeners();
-
-  showFeedback('Application initialized successfully', 'success');
-}
 
 // Initialize the Leaflet map
 function initMap() {
   return new Promise((resolve, reject) => {
     try {
       if (map) {
-        map.remove();
+        map.remove(); // Remove existing map if any
       }
       map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
@@ -172,11 +165,14 @@ async function initWacoLimitsLayer() {
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
 
+    // Wait for map to be initialized
+    await map; // This will wait for the Promise returned by initMap() to resolve
+
     if (wacoLimitsLayer && map.hasLayer(wacoLimitsLayer)) {
       map.removeLayer(wacoLimitsLayer);
     }
 
-    const geoJSONData = await fetchGeoJSON(`/static/${wacoBoundary}.geojson`);
+    const geoJSONData = await fetchGeoJSON(`/static/boundaries/${wacoBoundary}.geojson`);
     wacoLimitsLayer = L.geoJSON(geoJSONData, {
       style: {
         color: 'red',
@@ -197,9 +193,10 @@ async function initWacoLimitsLayer() {
 function updateWacoLimitsLayerVisibility() {
   const showWacoLimits = document.getElementById('wacoLimitsCheckbox').checked;
 
-  if (showWacoLimits && map && !map.hasLayer(wacoLimitsLayer)) {
-    wacoLimitsLayer.addTo(map); // Just add the layer if it's not already on the map
-  } else if (!showWacoLimits && map && map.hasLayer(wacoLimitsLayer)) {
+  // Wait for map to be initialized
+  if (map && showWacoLimits && !map.hasLayer(wacoLimitsLayer)) {
+    wacoLimitsLayer.addTo(map);
+  } else if (map && !showWacoLimits && map.hasLayer(wacoLimitsLayer)) {
     map.removeLayer(wacoLimitsLayer);
   }
 }
@@ -207,6 +204,9 @@ function updateWacoLimitsLayerVisibility() {
 // Initialize the progress layer
 async function initProgressLayer() {
   try {
+    // Wait for map to be initialized
+    await map;
+
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${DEFAULT_WACO_BOUNDARY}`);
     progressLayer = L.geoJSON(data, {
       style: (feature) => ({
@@ -226,9 +226,11 @@ async function initProgressLayer() {
 // Update the visibility of the progress layer based on checkbox state
 function updateProgressLayerVisibility() {
   const showProgressLayer = document.getElementById('progressLayerCheckbox').checked;
-  if (showProgressLayer && map && !map.hasLayer(progressLayer)) {
+
+  // Wait for map to be initialized
+  if (map && showProgressLayer && !map.hasLayer(progressLayer)) {
     progressLayer.addTo(map);
-  } else if (!showProgressLayer && map && map.hasLayer(progressLayer)) {
+  } else if (map && !showProgressLayer && map.hasLayer(progressLayer)) {
     map.removeLayer(progressLayer);
   }
 }
@@ -238,6 +240,10 @@ async function initWacoStreetsLayer() {
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const streetsFilter = document.getElementById('streets-select').value;
+
+    // Wait for map to be initialized
+    await map;
+
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
     if (wacoStreetsLayer && map) {
       map.removeLayer(wacoStreetsLayer);
@@ -293,6 +299,9 @@ async function loadHistoricalData() {
       const data = await fetchHistoricalData(startDate, endDate);
 
       if (data?.features && data.features.length > 0) {
+        // Wait for map to be initialized
+        await map;
+
         historicalDataLayer = L.geoJSON(data, {
           style: {
             color: '#0000FF',
@@ -368,16 +377,21 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
 // Update the visibility of the Waco streets layer based on checkbox state
 function updateWacoStreetsLayerVisibility() {
   const showWacoStreets = document.getElementById('wacoStreetsCheckbox').checked;
-  if (showWacoStreets && map && !map.hasLayer(wacoStreetsLayer)) {
+
+  // Wait for map to be initialized
+  if (map && showWacoStreets && !map.hasLayer(wacoStreetsLayer)) {
     wacoStreetsLayer.addTo(map);
-  } else if (!showWacoStreets && map && map.hasLayer(wacoStreetsLayer)) {
+  } else if (map && !showWacoStreets && map.hasLayer(wacoStreetsLayer)) {
     map.removeLayer(wacoStreetsLayer);
   }
 }
 
-// Load live route data from the server (continued)
+// Load live route data from the server
 async function loadLiveRouteData() {
   try {
+    // Wait for map to be initialized
+    await map;
+
     const data = await fetchGeoJSON('/live_route');
     if (data?.features?.[0]?.geometry?.coordinates?.length > 0) {
       const coordinates = data.features[0].geometry.coordinates.filter(coord => 
@@ -506,6 +520,10 @@ async function updateProgress() {
 async function loadProgressData() {
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+
+    // Wait for map to be initialized
+    await map;
+
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
     if (progressLayer && map) {
       map.removeLayer(progressLayer);
@@ -531,6 +549,10 @@ async function loadWacoStreets() {
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const streetsFilter = document.getElementById('streets-select').value;
+
+    // Wait for map to be initialized
+    await map;
+
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
     if (wacoStreetsLayer && map) {
       map.removeLayer(wacoStreetsLayer);
@@ -735,7 +757,7 @@ function filterRoutesBy(period) {
   displayHistoricalData();
 }
 
-// Export historical data to a GPX file (continued)
+// Export historical data to a GPX file
 async function exportToGPX() {
   showLoading('Preparing GPX export...');
   try {
@@ -871,13 +893,14 @@ function enableFilterControls() {
       document.querySelectorAll(selector).forEach(el => el.disabled = false);
     });
 }
-
 // Update the visibility of the historical data layer based on checkbox state
 function updateHistoricalDataLayerVisibility() {
   const showHistoricalData = document.getElementById('historicalDataCheckbox').checked;
-  if (showHistoricalData && map && historicalDataLayer && !map.hasLayer(historicalDataLayer)) {
+
+  // Wait for map to be initialized
+  if (map && showHistoricalData && historicalDataLayer && !map.hasLayer(historicalDataLayer)) {
     historicalDataLayer.addTo(map);
-  } else if (!showHistoricalData && map && historicalDataLayer && map.hasLayer(historicalDataLayer)) {
+  } else if (map && !showHistoricalData && historicalDataLayer && map.hasLayer(historicalDataLayer)) {
     map.removeLayer(historicalDataLayer);
   }
 }
@@ -898,7 +921,11 @@ function setupEventListeners() {
 
   // Waco Boundary Select Event Listener
   if (wacoBoundarySelectEl) {
-    wacoBoundarySelectEl.addEventListener('change', initWacoLimitsLayer); // Call initWacoLimitsLayer directly
+    wacoBoundarySelectEl.addEventListener('change', async () => {
+      await initWacoLimitsLayer(); // Update Waco limits when boundary changes
+      await loadProgressData(); // Update progress layer with new boundary
+      await loadWacoStreets(); // Update Waco streets with new boundary
+    });
   }
 
   const timeFiltersEl = document.getElementById('time-filters');
@@ -1149,7 +1176,7 @@ function animateStatUpdate(elementId, newValue) {
   }
 }
 
-// Animate an element with a given animation class (continued)
+// Animate an element with a given animation class
 function animateElement(element, animationClass) {
   element.classList.add('animate__animated', animationClass);
   setTimeout(() => {
@@ -1248,7 +1275,7 @@ function checkQueuedTasks() {
 
 // Helper function to remove a layer from the map
 function removeLayer(layer) {
-  if (layer && map.hasLayer(layer)) {
+  if (layer && map && map.hasLayer(layer)) { // Check if map is defined
     map.removeLayer(layer);
   }
 }
@@ -1278,45 +1305,7 @@ function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
-// Initialize the application
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    showFeedback('Initializing application...', 'info');
-
-    // Initialize the map
-    map = await initMap();
-
-    // Initialize layers and controls
-    await Promise.all([
-      initWacoLimitsLayer(),
-      initProgressLayer(),
-      initWacoStreetsLayer(),
-      loadHistoricalData().catch(error => {
-        console.error('Historical data loading failed:', error);
-        showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
-      }),
-      loadLiveRouteData().catch(error => {
-        console.error('Live route data loading failed:', error);
-        showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
-      })
-    ]);
-
-    // Set up data polling and updates
-    setInterval(updateLiveDataAndMetrics, LIVE_DATA_AND_METRICS_UPDATE_INTERVAL);
-    setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
-    setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
-
-    // Set up event listeners
-    setupEventListeners();
-
-    showFeedback('Application initialized successfully', 'success');
-  } catch (error) {
-    handleError(error, 'initializing application');
-  } finally {
-    hideLoading(); // Ensure loading screen is hidden regardless of success or failure
-  }
-});
-
+// Expose functions for debugging (optional)
 window.mapApp = {
   map,
   initMap,

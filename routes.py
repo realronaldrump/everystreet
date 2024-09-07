@@ -299,9 +299,9 @@ def register_routes(app):
 
             waco_limits = None
             if filter_waco:
-                waco_limits = geojson_handler.load_waco_boundary(waco_boundary)
+                waco_limits = await geojson_handler.load_waco_boundary(waco_boundary)  # Await the coroutine
 
-            filtered_features = geojson_handler.filter_geojson_features(
+            filtered_features = await geojson_handler.filter_geojson_features(  # Await the coroutine
                 start_date, end_date, filter_waco, waco_limits
             )
 

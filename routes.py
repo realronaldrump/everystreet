@@ -17,14 +17,30 @@ from tasks import load_historical_data_background, poll_bouncie_api
 from utils import geolocator, login_required
 
 logger = logging.getLogger(__name__)
-config = Config()
+import os
+from config import Config
+
+config = Config(
+    PIN=os.environ.get('PIN', ''),
+    CLIENT_ID=os.environ.get('CLIENT_ID', ''),
+    CLIENT_SECRET=os.environ.get('CLIENT_SECRET', ''),
+    REDIRECT_URI=os.environ.get('REDIRECT_URI', ''),
+    AUTH_CODE=os.environ.get('AUTH_CODE', ''),
+    VEHICLE_ID=os.environ.get('VEHICLE_ID', ''),
+    DEVICE_IMEI=os.environ.get('DEVICE_IMEI', ''),
+    GOOGLE_MAPS_API=os.environ.get('GOOGLE_MAPS_API', ''),
+    ANTHROPIC_API_KEY=os.environ.get('ANTHROPIC_API_KEY', ''),
+    OPENAI_API_KEY=os.environ.get('OPENAI_API_KEY', ''),
+    USERNAME=os.environ.get('USERNAME', ''),
+    PASSWORD=os.environ.get('PASSWORD', ''),
+    SECRET_KEY=os.environ.get('SECRET_KEY', '')
+)
 
 # Removed BouncieAPI instance creation here
 gpx_exporter = GPXExporter(None)
+from cachetools import TTLCache
 
-# Initialize cache
-cache = TTLCache(maxsize=100, ttl=3600)
-
+cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
 
 def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer

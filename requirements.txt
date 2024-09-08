@@ -19,3 +19,15 @@ pydantic
 httpx
 pydantic-settings
 cachetools
+types-aiofiles
+types-tqdm
+lxml-stubs
+types-python-dateutil
+pandas-stubs
+types-cachetools
+types-geopy
+types-geopandas
+types-shapely
+types-geopy
+types-geopandas
+types-shapely

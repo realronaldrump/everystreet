@@ -57,14 +57,17 @@ def get_end_of_day(date: Union[str, datetime]) -> datetime:
     )
 
 
+from typing import Iterator, Union
+from datetime import datetime, date
+
 def date_range(
     start_date: Union[str, datetime], end_date: Union[str, datetime]
-) -> iter:
+) -> Iterator[date]:
     """Generate a range of dates from start_date to end_date, inclusive."""
     start = get_start_of_day(parse_date(start_date))
     end = get_start_of_day(parse_date(end_date))
     while start <= end:
-        yield start
+        yield start.date()
         start += timedelta(days=1)
 
 

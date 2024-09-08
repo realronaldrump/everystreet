@@ -416,7 +416,7 @@ function updateLiveData(liveData) {
 // Update live data and metrics
 async function updateLiveDataAndMetrics() {
   if (liveDataFetchController) {
-    liveDataFetchController.abort(); // Abort any previous requests
+    liveDataFetchController.abort();
   }
 
   liveDataFetchController = new AbortController();
@@ -435,13 +435,39 @@ async function updateLiveDataAndMetrics() {
       timeoutPromise
     ]);
 
+    console.log('Live data:', liveData);
+    console.log('Metrics:', metrics);
+
     if (liveData && !liveData.error) {
-      updateLiveData(liveData);
+      Object.entries(liveData).forEach(([imei, data]) => {
+        updateLiveData(imei, data);
+        
+        // Update UI elements for live data
+        document.getElementById('lastUpdated').textContent = new Date(data.timestamp * 1000).toLocaleString();
+        document.getElementById('speed').textContent = `${data.speed.toFixed(2)} mph`;
+        document.getElementById('location').textContent = `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`;
+      });
     } else {
       console.error('Error fetching live data:', liveData?.error || 'No data received');
       showFeedback('Device offline or no live data available', 'warning');
     }
+
+    // Update trip metrics
+    if (metrics && Object.keys(metrics).length > 0) {
+      Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
+        document.getElementById('totalDistance').textContent = `${deviceMetrics.total_distance.toFixed(2)} miles`;
+        document.getElementById('totalTime').textContent = deviceMetrics.total_time;
+        document.getElementById('maxSpeed').textContent = `${deviceMetrics.max_speed.toFixed(2)} mph`;
+        document.getElementById('startTime').textContent = new Date(deviceMetrics.start_time).toLocaleString();
+        document.getElementById('endTime').textContent = new Date(deviceMetrics.end_time).toLocaleString();
+      });
+    } else {
+      console.warn('No metrics data received');
+    }
+
+    // Animate the updates
     animateStatUpdates(metrics);
+
   } catch (error) {
     if (error.name === 'AbortError') {
       console.log('Live data request aborted');

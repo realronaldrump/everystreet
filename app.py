@@ -1,10 +1,15 @@
+"""
+This module is the entry point for the EveryStreet application.
+It sets up logging and runs the Quart application using Hypercorn.
+"""
+
 import os
 import sys
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 import asyncio
 import logging
+
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
@@ -22,15 +27,12 @@ logger = logging.getLogger(__name__)
 
 
 async def run_app():
+    """
+    Creates and runs the Quart application using Hypercorn.
+    """
     logger.info("Creating app...")
     app = await create_app()
     logger.info("App created successfully")
-
-    logger.info("Registering routes...")
-    from routes import register_routes
-
-    register_routes(app)
-    logger.info("Routes registered successfully")
 
     config_local = HyperConfig()
     config_local.bind = ["0.0.0.0:8080"]
@@ -40,7 +42,7 @@ async def run_app():
     try:
         await serve(app, config_local)
     except Exception as e:
-        logger.error(f"Error starting Hypercorn server: {str(e)}", exc_info=True)
+        logger.error(f"Error starting Hypercorn server: {e}", exc_info=True)
         raise
     finally:
         await app.shutdown()

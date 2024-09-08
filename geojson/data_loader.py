@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class DataLoader:
     async def load_data(self, handler):
+        total_features = 0
         async with handler.waco_analyzer.lock:
             if handler.historical_geojson_features:
                 logger.info("Historical data already loaded.")
@@ -27,7 +28,6 @@ class DataLoader:
                     if f.startswith("historical_data_") and f.endswith(".geojson")
                 ]
 
-                total_features = 0
                 if monthly_files:
                     with tqdm(
                         total=len(monthly_files),
@@ -66,7 +66,5 @@ class DataLoader:
                 await handler.update_all_progress()
 
             except Exception as e:
-                logger.error(
-                    f"Unexpected error loading historical data: {str(e)}", exc_info=True
-                )
+                logger.error(f"Unexpected error loading historical data: {str(e)}", exc_info=True)
                 raise Exception(f"Error loading historical data: {str(e)}")

@@ -1,7 +1,7 @@
 aiohttp
 bounciepy
 geopy
-Shapely
+shapely
 lxml
 eventlet
 rtree
@@ -25,9 +25,7 @@ lxml-stubs
 types-python-dateutil
 pandas-stubs
 types-cachetools
-types-geopy
-types-geopandas
 types-shapely
-types-geopy
-types-geopandas
-types-shapely
+dill
+hypercorn
+pylint

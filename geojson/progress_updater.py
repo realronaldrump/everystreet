@@ -39,7 +39,7 @@ class ProgressUpdater:
             logger.error(f"Error updating progress: {str(e)}", exc_info=True)
             raise
 
-    async def update_streets_progress(self, handler):
+    async def update_streets_progress(self):
         try:
             coverage_analysis = self.waco_analyzer.calculate_progress()
             logging.info(f"Raw coverage analysis: {coverage_analysis}")

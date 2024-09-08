@@ -717,3 +717,60 @@ audio[controls] {
   color: #fff;
   margin-top: 10px;
 }
+.notification-icon {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: var(--accent-color);
+  color: var(--text-color);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 1001;
+}
+
+.notification-count {
+  font-weight: bold;
+}
+
+.notification-panel {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  background-color: var(--secondary-bg);
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  display: none;
+  z-index: 1000;
+}
+
+.notification-panel h3 {
+  margin: 0;
+  padding: 10px;
+  background-color: var(--accent-color);
+  color: var(--text-color);
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.notification-panel ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.notification-panel li {
+  padding: 10px;
+  border-bottom: 1px solid #444;
+  color: var(--text-color);
+}
+
+.notification-panel li:last-child {
+  border-bottom: none;
+}

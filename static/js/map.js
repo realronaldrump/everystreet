@@ -289,48 +289,27 @@ async function initWacoStreetsLayer() {
 
 // Load historical data from the server
 async function loadHistoricalData() {
-  let historicalDataLoadAttempts = 0;
-  let daysAgo = 0; // Start with yesterday
-
-  while (historicalDataLoadAttempts < MAX_HISTORICAL_DATA_LOAD_ATTEMPTS) {
-    try {
-      const startDate = daysAgo === 0 ? formatDate(yesterday()) : formatDate(daysAgoDaysAgo(daysAgo));
-      const endDate = daysAgo === 0 ? formatDate(today()) : formatDate(daysAgoDaysAgo(daysAgo - 1));
-      const data = await fetchHistoricalData(startDate, endDate);
-
-      if (data?.features && data.features.length > 0) {
-        // Wait for map to be initialized
-        await map;
-
-        historicalDataLayer = L.geoJSON(data, {
-          style: {
-            color: '#0000FF',
-            weight: 3,
-            opacity: 0.7
-          },
-          onEachFeature: addRoutePopup,
-          pane: 'historicalDataPane'
-        });
-        updateHistoricalDataLayerVisibility();
-        animateStatUpdate('totalHistoricalDistance', `${calculateTotalDistance(data.features).toFixed(2)} miles`);
-        showFeedback('Historical data loaded successfully', 'success');
-        return;
-      } else {
-        daysAgo++; // Try data from a few days ago
-        throw new Error('Invalid or empty historical data received');
-      }
-    } catch (error) {
-      console.error('Error loading historical data:', error);
-      showFeedback('Error loading historical data. Retrying...', 'error');
+  try {
+    const response = await fetch('/api/load_historical_data');
+    const data = await response.json();
+    if (data.historical_geojson_features) {
+      historicalDataLayer = L.geoJSON(data.historical_geojson_features, {
+        style: {
+          color: '#0000FF',
+          weight: 3,
+          opacity: 0.7
+        },
+        onEachFeature: addRoutePopup,
+        pane: 'historicalDataPane'
+      });
+      updateHistoricalDataLayerVisibility();
+      animateStatUpdate('totalHistoricalDistance', `${calculateTotalDistance(data.historical_geojson_features).toFixed(2)} miles`);
+      showFeedback('Historical data loaded successfully', 'success');
     }
-
-    historicalDataLoadAttempts++;
-    await delay(5000); // Wait 5 seconds before retrying
+  } catch (error) {
+    handleError(error, 'loading historical data');
   }
-
-  showFeedback('Error loading historical data. Please refresh the page.', 'error');
 }
-
 async function fetchHistoricalData(startDate = null, endDate = null) {
   try {
     const filterWaco = document.getElementById('filterWaco').checked;
@@ -389,41 +368,31 @@ function updateWacoStreetsLayerVisibility() {
 // Load live route data from the server
 async function loadLiveRouteData() {
   try {
-    // Wait for map to be initialized
-    await map;
-
-    const data = await fetchGeoJSON('/live_route');
+    const response = await fetch('/api/live_route_data');
+    const data = await response.json();
     if (data?.features?.[0]?.geometry?.coordinates?.length > 0) {
       const coordinates = data.features[0].geometry.coordinates.filter(coord => 
         Array.isArray(coord) && coord.length >= 2 && 
         !isNaN(coord[0]) && !isNaN(coord[1])
       );
-
-      if (coordinates.length > 1) {
-        liveRoutePolyline = L.polyline(coordinates.map(coord => [coord[1], coord[0]]), {
-          color: '#007bff',
-          weight: 4
-        }).addTo(map);
-      } else {
-        console.warn('Not enough valid coordinates to create a polyline');
-        showFeedback('Not enough valid coordinates to display route', 'warning');
-      }
-
+      
       if (coordinates.length > 0) {
+        liveRouteLayer = L.polyline(coordinates, {
+          color: 'red',
+          weight: 5,
+          opacity: 0.7,
+          pane: 'liveRoutePane'
+        }).addTo(map);
+        
         const lastCoord = coordinates[coordinates.length - 1];
-        liveMarker = createAnimatedMarker([lastCoord[1], lastCoord[0]], { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
-        map.setView([lastCoord[1], lastCoord[0]], 13);
-      } else {
-        console.warn('No valid coordinates found');
-        showFeedback('No valid coordinates found for live route', 'warning');
+        liveMarker = L.marker(lastCoord, {icon: RED_BLINKING_MARKER_ICON}).addTo(map);
+        
+        map.fitBounds(liveRouteLayer.getBounds());
+        showFeedback('Live route data loaded successfully', 'success');
       }
-    } else {
-      console.warn('Live route data is missing or incomplete:', data);
-      showFeedback('Live route data is missing or incomplete', 'warning');
     }
   } catch (error) {
-    console.error('Error loading live route data:', error);
-    showFeedback('Error loading live route data', 'error');
+    handleError(error, 'loading live route data');
   }
 }
 
@@ -436,10 +405,14 @@ function clearLiveRoute() {
 // Update live data on the map
 function updateLiveData(liveData) {
   removeLayer(liveMarker);
-  const latLng = [liveData.latitude, liveData.longitude];
-  liveMarker = createAnimatedMarker(latLng, { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
+  if (liveData && typeof liveData.latitude === 'number' && typeof liveData.longitude === 'number') {
+    const latLng = [liveData.latitude, liveData.longitude];
+    liveMarker = createAnimatedMarker(latLng, { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
+  } else {
+    console.warn('Invalid live data received:', liveData);
+    showFeedback('Invalid live data received', 'warning');
+  }
 }
-
 // Update live data and metrics
 async function updateLiveDataAndMetrics() {
   if (liveDataFetchController) {
@@ -462,10 +435,10 @@ async function updateLiveDataAndMetrics() {
       timeoutPromise
     ]);
 
-    if (!liveData.error) {
+    if (liveData && !liveData.error) {
       updateLiveData(liveData);
     } else {
-      console.error('Error fetching live data:', liveData.error);
+      console.error('Error fetching live data:', liveData?.error || 'No data received');
       showFeedback('Device offline or no live data available', 'warning');
     }
     animateStatUpdates(metrics);
@@ -480,7 +453,6 @@ async function updateLiveDataAndMetrics() {
     liveDataFetchController = null;
   }
 }
-
 // Animate updates to the statistics panel
 function animateStatUpdates(metrics) {
   ['totalDistance', 'totalTime', 'maxSpeed', 'startTime', 'endTime'].forEach(id => {
@@ -1200,29 +1172,26 @@ async function fetchGeoJSON(url) {
 
 // Display a feedback message
 function showFeedback(message, type = 'info', duration = FEEDBACK_DURATION) {
-  const feedbackContainer = document.getElementById('feedback-container');
-  const feedbackElement = document.createElement('div');
-  feedbackElement.className = `feedback ${type} animate__animated animate__fadeInDown`;
+  const notificationList = document.getElementById('notification-list');
+  const notificationCount = document.getElementById('notification-count');
 
-  const icon = document.createElement('span');
-  icon.className = 'feedback-icon';
-  icon.textContent = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+  const listItem = document.createElement('li');
+  listItem.className = `feedback ${type}`;
+  listItem.textContent = `${type.toUpperCase()}: ${message}`;
+  notificationList.appendChild(listItem);
 
-  const textElement = document.createElement('span');
-  textElement.textContent = message;
-
-  feedbackElement.appendChild(icon);
-  feedbackElement.appendChild(textElement);
-  feedbackContainer.appendChild(feedbackElement);
+  // Update notification count
+  const currentCount = parseInt(notificationCount.textContent, 10);
+  notificationCount.textContent = currentCount + 1;
 
   console.log(`${type.toUpperCase()}: ${message}`); // Log all feedback messages
-
-  setTimeout(() => {
-    feedbackElement.classList.remove('animate__fadeInDown');
-    feedbackElement.classList.add('animate__fadeOutUp');
-    setTimeout(() => feedbackElement.remove(), 1000);
-  }, duration);
 }
+
+// Toggle notification panel visibility
+document.getElementById('notification-icon').addEventListener('click', () => {
+  const panel = document.getElementById('notification-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+});
 
 function handleError(error, context) {
   console.error(`Error in ${context}:`, error);

@@ -12,7 +12,11 @@ class DataLoader:
         async with handler.waco_analyzer.lock:
             if handler.historical_geojson_features:
                 logger.info("Historical data already loaded.")
-                return
+                return {
+                    'historical_geojson_features': handler.historical_geojson_features,
+                    'monthly_data': handler.monthly_data,
+                    'total_features': total_features
+                }
 
             try:
                 logger.info("Loading historical data from monthly files.")

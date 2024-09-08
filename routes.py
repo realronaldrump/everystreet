@@ -392,3 +392,19 @@ def register_routes(app):
             logger.error(f"Error during shutdown: {str(e)}", exc_info=True)
         finally:
             logger.info("Shutdown complete")
+
+    @app.route('/api/load_historical_data', methods=['GET'])
+    async def load_historical_data():
+        try:
+            data = await geojson_handler.data_loader.load_data(geojson_handler)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/live_route_data', methods=['GET'])
+    async def get_live_route_data():
+        try:
+            data = await geojson_handler.data_processor.get_live_route_data()
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500

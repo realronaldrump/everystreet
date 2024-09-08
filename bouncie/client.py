@@ -1,7 +1,6 @@
 import logging
 import os
 from bounciepy import AsyncRESTAPIClient
-from bounciepy.exceptions import BouncieException
 
 logger = logging.getLogger(__name__)
 

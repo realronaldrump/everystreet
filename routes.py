@@ -1,19 +1,16 @@
+# This Python module, `routes.py`, is designed for a Quart web application. It defines various asynchronous routes and WebSocket endpoints for managing and interacting with geographical and historical data, specifically focusing on the Waco area. Key functionalities include fetching and filtering historical data, managing live route data, exporting data to GPX format, searching locations, and handling user authentication. The module also manages application startup and shutdown processes, ensuring proper task management and API client session handling. Caching is used to optimize data retrieval, and error handling is implemented throughout to ensure robust operation.
+
 import asyncio
 from datetime import datetime, date, timezone
 import json
 import logging
-
 from quart import jsonify, redirect, render_template, request, session, url_for, Response, websocket
-from quart_cors import cors
 from cachetools import TTLCache
-
 from config import Config
 from date_utils import format_date, timedelta
-from geojson.geojson_handler import GeoJSONHandler
 from gpx_exporter import GPXExporter
 from models import DateRange, HistoricalDataParams
-from utils import login_required, geolocator, TaskManager
-from waco_streets_analyzer import WacoStreetsAnalyzer
+from utils import login_required, geolocator
 from tasks import load_historical_data_background, poll_bouncie_api
 
 logger = logging.getLogger(__name__)
@@ -60,13 +57,10 @@ def register_routes(app):
                 waco_boundary=request.args.get("wacoBoundary", "city_limits"),
                 bounds=[float(x) for x in request.args.get("bounds", "").split(",")] if request.args.get("bounds") else None
             )
-
             logger.info(f"Received request for filtered historical data: {params}")
-
             waco_limits = None
             if params.filter_waco and params.waco_boundary != "none":
                 waco_limits = await geojson_handler.load_waco_boundary(params.waco_boundary)
-
             filtered_features = await geojson_handler.filter_geojson_features(
                 params.date_range.start_date.isoformat(),
                 params.date_range.end_date.isoformat(),
@@ -74,15 +68,12 @@ def register_routes(app):
                 waco_limits,
                 bounds=params.bounds
             )
-
             result = {
                 "type": "FeatureCollection",
                 "features": filtered_features,
                 "total_features": len(filtered_features)
             }
-
             return jsonify(result)
-
         except ValueError as e:
             logger.error(f"Error parsing parameters: {str(e)}")
             return jsonify({"error": f"Invalid parameter: {str(e)}"}), 400
@@ -96,17 +87,13 @@ def register_routes(app):
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
             streets_filter = request.args.get("filter", "all")
             cache_key = f"waco_streets_{waco_boundary}_{streets_filter}"
-            
             if cache_key in cache:
                 return jsonify(cache[cache_key])
-            
             logging.info(f"Fetching Waco streets: boundary={waco_boundary}, filter={streets_filter}")
             streets_geojson = await geojson_handler.get_waco_streets(waco_boundary, streets_filter)
             streets_data = json.loads(streets_geojson)
-            
             if 'features' not in streets_data:
                 raise ValueError("Invalid GeoJSON: 'features' key not found")
-            
             cache[cache_key] = streets_data
             logging.info(f"Returning {len(streets_data['features'])} street features")
             return jsonify(streets_data)
@@ -175,16 +162,13 @@ def register_routes(app):
         end_date = request.args.get("endDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
         filter_waco = request.args.get("filterWaco", "false").lower() == "true"
         waco_boundary = request.args.get("wacoBoundary", "city_limits")
-
         try:
             gpx_data = await gpx_exporter.export_to_gpx(
                 format_date(start_date), format_date(end_date), filter_waco, waco_boundary
             )
-
             if gpx_data is None:
                 logger.warning("No data found for GPX export")
                 return jsonify({"error": "No data found for the specified date range"}), 404
-
             return Response(
                 gpx_data,
                 mimetype="application/gpx+xml",
@@ -199,7 +183,6 @@ def register_routes(app):
         query = request.args.get("query")
         if not query:
             return jsonify({"error": "No search query provided"}), 400
-
         try:
             location = await asyncio.to_thread(geolocator.geocode, query)
             if location:
@@ -218,7 +201,6 @@ def register_routes(app):
         query = request.args.get("query")
         if not query:
             return jsonify({"error": "No search query provided"}), 400
-
         try:
             locations = await asyncio.to_thread(geolocator.geocode, query, exactly_one=False, limit=5)
             if locations:
@@ -234,7 +216,6 @@ def register_routes(app):
         async with app.processing_lock:
             if app.is_processing:
                 return jsonify({"error": "Another process is already running"}), 429
-
             try:
                 app.is_processing = True
                 logger.info("Starting historical data update process")
@@ -268,17 +249,13 @@ def register_routes(app):
         async with app.processing_lock:
             if app.is_processing:
                 return jsonify({"error": "Another process is already running"}), 429
-
             try:
                 app.is_processing = True
                 logger.info("Starting progress reset process")
-
                 # Reset the progress in the WacoStreetsAnalyzer
                 await waco_analyzer.reset_progress()
-
                 # Recalculate the progress using all historical data
                 await geojson_handler.update_all_progress()
-
                 logger.info("Progress reset and recalculated successfully")
                 return jsonify({"message": "Progress has been reset and recalculated successfully!"}), 200
             except Exception as e:
@@ -294,17 +271,13 @@ def register_routes(app):
             end_date = request.args.get("endDate")
             filter_waco = request.args.get("filterWaco", "false").lower() == "true"
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
-
             logger.info(f"Fetching historical data for: {start_date} to {end_date}, filterWaco: {filter_waco}, wacoBoundary: {waco_boundary}")
-
             waco_limits = None
             if filter_waco:
                 waco_limits = await geojson_handler.load_waco_boundary(waco_boundary)  # Await the coroutine
-
             filtered_features = await geojson_handler.filter_geojson_features(  # Await the coroutine
                 start_date, end_date, filter_waco, waco_limits
             )
-
             return jsonify({
                 "type": "FeatureCollection",
                 "features": filtered_features
@@ -339,10 +312,8 @@ def register_routes(app):
     @login_required
     async def index():
         today = datetime.now().strftime("%Y-%m-%d")
-        
         # Calculate the start date for the last month
         last_month_start = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
-        
         async with app.historical_data_lock:
             return await render_template(
                 "index.html", 
@@ -357,16 +328,13 @@ def register_routes(app):
         logger.info("Starting application initialization...")
         try:
             logger.info("Initializing historical data...")
-
             # Load historical data but do not update progress yet
             await load_historical_data_background(app, geojson_handler)
             logger.info("Historical data initialized without progress update.")
-
             if not hasattr(app, 'background_tasks_started'):
                 app.task_manager.add_task(poll_bouncie_api(app, bouncie_api))
                 app.background_tasks_started = True
                 logger.debug("Bouncie API polling task added")
-
             logger.debug(f"Available routes: {app.url_map}")
             logger.info("Application initialization complete")
         except Exception as e:
@@ -379,15 +347,12 @@ def register_routes(app):
         try:
             await app.task_manager.cancel_all()
             logger.info("All tasks cancelled")
-
             if bouncie_api.client and bouncie_api.client.client_session:
                 await bouncie_api.client.client_session.close()
                 logger.info("Bouncie API client session closed")
-
             if geojson_handler.bouncie_api.client and geojson_handler.bouncie_api.client.client_session:
                 await geojson_handler.bouncie_api.client.client_session.close()
                 logger.info("GeoJSON handler Bouncie API client session closed")
-
         except Exception as e:
             logger.error(f"Error during shutdown: {str(e)}", exc_info=True)
         finally:

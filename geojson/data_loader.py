@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone
 from tqdm import tqdm
 import aiofiles
 

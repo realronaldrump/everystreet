@@ -6,77 +6,7 @@ const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
 const DEFAULT_WACO_BOUNDARY = 'less_goofy';
 const DEFAULT_WACO_STREETS_OPACITY = 0.7;
 const DEFAULT_WACO_STREETS_FILTER = 'all';
-// Initialize the Leaflet map
-async function initMap() {
-  if (map) {
-    map.remove(); // Remove existing map if any
-  }
-  map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19
-  }).addTo(map);
-
-  // Create map panes with correct z-index order
-  ['wacoLimitsPane', 'progressPane', 'historicalDataPane', 'wacoStreetsPane'].forEach((pane, index) => {
-    map.createPane(pane).style.zIndex = 400 + index * 10;
-  });
-
-  // Add progress controls
-  const progressControl = L.control({ position: 'bottomleft' });
-  progressControl.onAdd = () => {
-    const div = L.DomUtil.create('div', 'progress-control');
-    div.innerHTML = '<div id="progress-bar-container"><div id="progress-bar"></div></div><div id="progress-text"></div>';
-    return div;
-  };
-  progressControl.addTo(map);
-
-  // Initialize drawing tools
-  drawnItems = new L.FeatureGroup();
-  map.addLayer(drawnItems);
-  const drawControl = new L.Control.Draw({
-    draw: {
-      polyline: false,
-      polygon: true,
-      circle: false,
-      rectangle: false,
-      marker: false,
-      circlemarker: false
-    },
-    edit: {
-      featureGroup: drawnItems
-    }
-  });
-  map.addControl(drawControl);
-
-  // Event listeners for drawing tools
-  map.on(L.Draw.Event.CREATED, (e) => {
-    drawnItems.addLayer(e.layer);
-    filterHistoricalDataByPolygon(e.layer);
-  });
-  map.on(L.Draw.Event.EDITED, (e) => {
-    e.layers.eachLayer(filterHistoricalDataByPolygon);
-  });
-  map.on(L.Draw.Event.DELETED, displayHistoricalData);
-  showFeedback('Map initialized successfully', 'success');
-}
-
-// Centralized error handler
-function handleError(error, context) {
-  console.error(`Error in ${context}:`, error);
-  showFeedback(`An error occurred while ${context}. Please try again.`, 'error');
-}
-
-// Fetch JSON data from a given URL with error handling
-async function fetchJSON(url, options = {}) {
-  try {
-    const response = await fetch(url, options);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  } catch (error) {
-    handleError(error, 'fetching data');
-    throw error;
-  }
-}
+const ALL_TIME_START_DATE = new Date(2020, 0, 1);
 const MAX_HISTORICAL_DATA_LOAD_ATTEMPTS = 3;
 const DATA_POLLING_INTERVAL = 1000; // Poll for live data every second
 const PROGRESS_UPDATE_INTERVAL = 60000; // Update progress every minute

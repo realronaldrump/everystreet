@@ -3,9 +3,7 @@ import os
 import pickle
 import asyncio
 import geopandas as gpd
-import pandas as pd
-from shapely.geometry import LineString, Point
-from shapely.ops import split
+from shapely.geometry import LineString
 import aiofiles
 from rtree import index
 

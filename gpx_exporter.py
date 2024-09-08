@@ -2,7 +2,6 @@ import logging
 from lxml import etree
 from datetime import datetime, timezone
 from date_utils import parse_date, format_date, get_start_of_day, get_end_of_day, date_range
-from geojson import GeoJSONHandler
 
 logger = logging.getLogger(__name__)
 

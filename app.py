@@ -4,7 +4,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
 import logging
-from logging.handlers import RotatingFileHandler
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
 from create_app import create_app

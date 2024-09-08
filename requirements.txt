@@ -29,3 +29,5 @@ types-shapely
 dill
 hypercorn
 pylint
+pytest
+pytest-asyncio

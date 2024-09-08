@@ -4,6 +4,7 @@ from bounciepy import AsyncRESTAPIClient
 
 logger = logging.getLogger(__name__)
 
+
 class BouncieClient:
     def __init__(self):
         self.client_id = os.getenv("CLIENT_ID")
@@ -13,7 +14,16 @@ class BouncieClient:
         self.device_imei = os.getenv("DEVICE_IMEI")
         self.vehicle_id = os.getenv("VEHICLE_ID")
 
-        if not all([self.client_id, self.client_secret, self.redirect_uri, self.auth_code, self.vehicle_id, self.device_imei]):
+        if not all(
+            [
+                self.client_id,
+                self.client_secret,
+                self.redirect_uri,
+                self.auth_code,
+                self.vehicle_id,
+                self.device_imei,
+            ]
+        ):
             raise ValueError("Missing required environment variables for BouncieAPI")
 
         self.client = AsyncRESTAPIClient(

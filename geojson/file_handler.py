@@ -8,13 +8,18 @@ from dateutil import parser
 
 logger = logging.getLogger(__name__)
 
+
 class FileHandler:
     async def update_monthly_files(self, handler, new_features):
-        logger.info(f"Starting update_monthly_files with {len(new_features)} new features")
+        logger.info(
+            f"Starting update_monthly_files with {len(new_features)} new features"
+        )
         months_to_update = set()
-        
+
         for feature in new_features:
-            feature["geometry"]["coordinates"] = self._convert_ndarray_to_list(feature["geometry"]["coordinates"])
+            feature["geometry"]["coordinates"] = self._convert_ndarray_to_list(
+                feature["geometry"]["coordinates"]
+            )
             timestamp = self._parse_timestamp(feature["properties"]["timestamp"])
             if timestamp is None:
                 continue
@@ -24,8 +29,10 @@ class FileHandler:
             if month_year not in handler.monthly_data:
                 handler.monthly_data[month_year] = []
 
-            if not any(existing_feature["properties"]["timestamp"] == timestamp 
-                       for existing_feature in handler.monthly_data[month_year]):
+            if not any(
+                existing_feature["properties"]["timestamp"] == timestamp
+                for existing_feature in handler.monthly_data[month_year]
+            ):
                 handler.monthly_data[month_year].append(feature)
                 months_to_update.add(month_year)
 
@@ -34,7 +41,10 @@ class FileHandler:
 
     async def _write_updated_monthly_files(self, handler, months_to_update):
         write_tasks = [
-            self._update_single_file(f"static/historical_data_{month_year}.geojson", handler.monthly_data[month_year])
+            self._update_single_file(
+                f"static/historical_data_{month_year}.geojson",
+                handler.monthly_data[month_year],
+            )
             for month_year in months_to_update
         ]
         await asyncio.gather(*write_tasks)
@@ -46,24 +56,37 @@ class FileHandler:
                     existing_data = json.loads(await f.read())
                     existing_features = existing_data.get("features", [])
                 except json.JSONDecodeError:
-                    logger.warning(f"File {filename} is corrupted, initializing empty features")
+                    logger.warning(
+                        f"File {filename} is corrupted, initializing empty features"
+                    )
                     existing_features = []
 
             all_features = self._merge_features(existing_features, features)
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             async with aiofiles.open(filename, "w") as f:
-                await f.write(json.dumps({
-                    "type": "FeatureCollection",
-                    "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
-                    "features": all_features
-                }, indent=4))
-            logger.info(f"Successfully wrote {len(all_features)} features to {filename}")
+                await f.write(
+                    json.dumps(
+                        {
+                            "type": "FeatureCollection",
+                            "crs": {
+                                "type": "name",
+                                "properties": {"name": "EPSG:4326"},
+                            },
+                            "features": all_features,
+                        },
+                        indent=4,
+                    )
+                )
+            logger.info(
+                f"Successfully wrote {len(all_features)} features to {filename}"
+            )
         except Exception as e:
             logger.error(f"Error writing to file {filename}: {str(e)}", exc_info=True)
 
     @staticmethod
     def _convert_ndarray_to_list(obj):
         import numpy as np
+
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         elif isinstance(obj, list):
@@ -73,7 +96,9 @@ class FileHandler:
 
     @staticmethod
     def _merge_features(existing_features, new_features):
-        existing_timestamps = {feature["properties"]["timestamp"] for feature in existing_features}
+        existing_timestamps = {
+            feature["properties"]["timestamp"] for feature in existing_features
+        }
         merged_features = existing_features.copy()
         for new_feature in new_features:
             if new_feature["properties"]["timestamp"] not in existing_timestamps:

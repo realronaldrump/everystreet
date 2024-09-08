@@ -1,5 +1,6 @@
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
@@ -17,6 +18,7 @@ log_file = os.path.join(LOG_DIRECTORY, "app.log")
 setup_logging(log_file)
 logger = logging.getLogger(__name__)
 
+
 async def run_app():
     logger.info("Creating app...")
     app = await create_app()
@@ -24,6 +26,7 @@ async def run_app():
 
     logger.info("Registering routes...")
     from routes import register_routes
+
     register_routes(app)
     logger.info("Routes registered successfully")
 
@@ -39,6 +42,7 @@ async def run_app():
         raise
     finally:
         await app.shutdown()
+
 
 if __name__ == "__main__":
     logger.info("Starting application...")

@@ -7,6 +7,7 @@ from .trip_processor import TripProcessor
 
 logger = logging.getLogger(__name__)
 
+
 class BouncieAPI:
     def __init__(self):
         self.client = BouncieClient()
@@ -25,7 +26,11 @@ class BouncieAPI:
 
             new_data_point = await self.data_fetcher.process_vehicle_data(vehicle_data)
             if new_data_point:
-                if self.live_trip_data["data"] and self.live_trip_data["data"][-1]["timestamp"] == new_data_point["timestamp"]:
+                if (
+                    self.live_trip_data["data"]
+                    and self.live_trip_data["data"][-1]["timestamp"]
+                    == new_data_point["timestamp"]
+                ):
                     logger.info("Duplicate timestamp found, not adding new data point.")
                     return None
 

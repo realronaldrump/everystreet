@@ -1,9 +1,16 @@
 import logging
 from lxml import etree
 from datetime import datetime, timezone
-from date_utils import parse_date, format_date, get_start_of_day, get_end_of_day, date_range
+from date_utils import (
+    parse_date,
+    format_date,
+    get_start_of_day,
+    get_end_of_day,
+    date_range,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class GPXExporter:
     def __init__(self, geojson_handler):
@@ -31,8 +38,8 @@ class GPXExporter:
                         format_date(get_start_of_day(current_date)),
                         format_date(get_end_of_day(current_date)),
                         filter_waco,
-                        waco_limits, 
-                        self.geojson_handler.monthly_data[month_year]
+                        waco_limits,
+                        self.geojson_handler.monthly_data[month_year],
                     )
                     filtered_features.extend(month_features)
 
@@ -47,13 +54,18 @@ class GPXExporter:
             # Add metadata
             metadata = etree.SubElement(gpx, "metadata")
             name = etree.SubElement(metadata, "name")
-            name.text = f"GPX Export {format_date(start_date)} to {format_date(end_date)}"
+            name.text = (
+                f"GPX Export {format_date(start_date)} to {format_date(end_date)}"
+            )
             time = etree.SubElement(metadata, "time")
             time.text = format_date(datetime.now(timezone.utc))
 
             for i, feature in enumerate(filtered_features):
                 logger.info(f"Processing feature {i+1}/{len(filtered_features)}")
-                if 'geometry' not in feature or 'coordinates' not in feature['geometry']:
+                if (
+                    "geometry" not in feature
+                    or "coordinates" not in feature["geometry"]
+                ):
                     logger.warning(f"Invalid feature structure: {feature}")
                     continue
 
@@ -77,13 +89,21 @@ class GPXExporter:
                         time = etree.SubElement(trkpt, "time")
                         timestamp = timestamps[j]
                         if isinstance(timestamp, (int, float)):
-                            time.text = format_date(datetime.fromtimestamp(timestamp, timezone.utc))
+                            time.text = format_date(
+                                datetime.fromtimestamp(timestamp, timezone.utc)
+                            )
                         elif isinstance(timestamp, tuple) and len(timestamp) >= 1:
-                            time.text = format_date(datetime.fromtimestamp(timestamp[0], timezone.utc))
+                            time.text = format_date(
+                                datetime.fromtimestamp(timestamp[0], timezone.utc)
+                            )
                         else:
-                            logger.warning(f"Invalid timestamp format for coordinate {j} in feature {i+1}: {timestamp}")
+                            logger.warning(
+                                f"Invalid timestamp format for coordinate {j} in feature {i+1}: {timestamp}"
+                            )
                     else:
-                        logger.warning(f"No timestamp for coordinate {j} in feature {i+1}")
+                        logger.warning(
+                            f"No timestamp for coordinate {j} in feature {i+1}"
+                        )
 
             gpx_data = etree.tostring(
                 gpx, pretty_print=True, xml_declaration=True, encoding="UTF-8"

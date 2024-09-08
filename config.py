@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 class Config(BaseSettings):
     PIN: str
     CLIENT_ID: str
@@ -19,5 +20,5 @@ class Config(BaseSettings):
 
     class Config:
         env_file = ".env"
-        env_file_encoding = 'utf-8'
+        env_file_encoding = "utf-8"
         case_sensitive = False

@@ -7,12 +7,15 @@ from geojson import GeoJSONHandler
 from waco_streets_analyzer import WacoStreetsAnalyzer
 from utils import load_live_route_data, TaskManager, logger
 
+
 async def create_app():
     app = cors(Quart(__name__))
     config = Config()
-    app.config.from_mapping({k: v for k, v in config.dict().items() if k not in ['Config']})
-    app.secret_key = config.SECRET_KEY 
-    app.config['SESSION_TYPE'] = 'filesystem'
+    app.config.from_mapping(
+        {k: v for k, v in config.dict().items() if k not in ["Config"]}
+    )
+    app.secret_key = config.SECRET_KEY
+    app.config["SESSION_TYPE"] = "filesystem"
 
     # Initialize app attributes
     app.historical_data_loaded = False
@@ -32,10 +35,10 @@ async def create_app():
     logger.info("BouncieAPI initialized successfully")
 
     # Initialize WacoStreetsAnalyzer
-    app.waco_streets_analyzer = WacoStreetsAnalyzer('static/Waco-Streets.geojson')
+    app.waco_streets_analyzer = WacoStreetsAnalyzer("static/Waco-Streets.geojson")
     await app.waco_streets_analyzer.initialize()
     logger.info("WacoStreetsAnalyzer initialized successfully")
-    
+
     # Initialize GeoJSONHandler (Pass the single BouncieAPI instance)
     app.geojson_handler = GeoJSONHandler(app.waco_streets_analyzer, app.bouncie_api)
     await app.geojson_handler.load_historical_data()

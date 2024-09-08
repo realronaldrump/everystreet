@@ -1,8 +1,9 @@
 import json
 import logging
 import os
-from tqdm import tqdm
+
 import aiofiles
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 

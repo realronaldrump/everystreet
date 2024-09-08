@@ -1,12 +1,14 @@
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
 import logging
+
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
+
 from create_app import create_app
 from utils import setup_logging
 

@@ -1,7 +1,7 @@
+import asyncio
+import json
 import logging
 from collections import defaultdict
-import json
-import asyncio
 
 from .data_loader import DataLoader
 from .data_processor import DataProcessor

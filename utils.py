@@ -1,10 +1,11 @@
+import asyncio
 import json
 import logging
 from functools import wraps
-from geopy.geocoders import Nominatim
-from quart import redirect, url_for, session
 from logging.handlers import RotatingFileHandler
-import asyncio
+
+from geopy.geocoders import Nominatim
+from quart import redirect, session, url_for
 
 # Live Route Data File
 LIVE_ROUTE_DATA_FILE = "live_route_data.geojson"

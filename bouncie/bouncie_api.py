@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+
 from .client import BouncieClient
 from .data_fetcher import DataFetcher
 from .geocoder import Geocoder

@@ -1,11 +1,12 @@
+import asyncio
 import logging
 import os
 import pickle
-import asyncio
-import geopandas as gpd
-from shapely.geometry import LineString
+
 import aiofiles
+import geopandas as gpd
 from rtree import index
+from shapely.geometry import LineString
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

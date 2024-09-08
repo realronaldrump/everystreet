@@ -1,26 +1,20 @@
 # This Python module, `routes.py`, is designed for a Quart web application. It defines various asynchronous routes and WebSocket endpoints for managing and interacting with geographical and historical data, specifically focusing on the Waco area. Key functionalities include fetching and filtering historical data, managing live route data, exporting data to GPX format, searching locations, and handling user authentication. The module also manages application startup and shutdown processes, ensuring proper task management and API client session handling. Caching is used to optimize data retrieval, and error handling is implemented throughout to ensure robust operation.
 
 import asyncio
-from datetime import datetime, date, timezone
 import json
 import logging
-from quart import (
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-    Response,
-    websocket,
-)
+from datetime import date, datetime, timezone
+
 from cachetools import TTLCache
+from quart import (Response, jsonify, redirect, render_template, request,
+                   session, url_for, websocket)
+
 from config import Config
 from date_utils import format_date, timedelta
 from gpx_exporter import GPXExporter
 from models import DateRange, HistoricalDataParams
-from utils import login_required, geolocator
 from tasks import load_historical_data_background, poll_bouncie_api
+from utils import geolocator, login_required
 
 logger = logging.getLogger(__name__)
 config = Config()

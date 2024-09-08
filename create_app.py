@@ -1,11 +1,13 @@
 import asyncio
+
 from quart import Quart
 from quart_cors import cors
-from config import Config
+
 from bouncie import BouncieAPI
+from config import Config
 from geojson import GeoJSONHandler
+from utils import TaskManager, load_live_route_data, logger
 from waco_streets_analyzer import WacoStreetsAnalyzer
-from utils import load_live_route_data, TaskManager, logger
 
 
 async def create_app():

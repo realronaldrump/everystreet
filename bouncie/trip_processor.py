@@ -1,6 +1,6 @@
 import logging
-import logging
 from datetime import datetime, timezone
+
 from geopy.distance import geodesic
 
 logger = logging.getLogger(__name__)
@@ -120,6 +120,7 @@ class TripProcessor:
 
 
 from datetime import datetime, timezone
+
 from geopy.distance import geodesic
 
 logger = logging.getLogger(__name__)

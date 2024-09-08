@@ -1,5 +1,6 @@
-import logging
 import asyncio
+import logging
+
 from geopy.geocoders import Nominatim
 
 logger = logging.getLogger(__name__)

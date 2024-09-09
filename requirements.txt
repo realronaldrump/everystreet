@@ -34,3 +34,4 @@ pytest-asyncio
 PyYAML
 snakeviz
 defusedxml
+celery

@@ -1,4 +1,7 @@
-# This Python module, `routes.py`, is designed for a Quart web application. It defines various asynchronous routes and WebSocket endpoints for managing and interacting with geographical and historical data, specifically focusing on the Waco area. Key functionalities include fetching and filtering historical data, managing live route data, exporting data to GPX format, searching locations, and handling user authentication. The module also manages application startup and shutdown processes, ensuring proper task management and API client session handling. Caching is used to optimize data retrieval, and error handling is implemented throughout to ensure robust operation.
+"""
+This module defines the routes for the EveryStreet application.
+It handles various HTTP requests and WebSocket connections.
+"""
 
 import asyncio
 import json
@@ -15,6 +18,7 @@ from gpx_exporter import GPXExporter
 from models import DateRange, HistoricalDataParams
 from tasks import load_historical_data_background, poll_bouncie_api
 from utils import geolocator, login_required
+from celery_tasks import update_historical_data_task, export_gpx_task, celery_app
 
 logger = logging.getLogger(__name__)
 import os
@@ -35,10 +39,6 @@ config = Config(
     PASSWORD=os.environ.get('PASSWORD', ''),
     SECRET_KEY=os.environ.get('SECRET_KEY', '')
 )
-
-# Removed BouncieAPI instance creation here
-gpx_exporter = GPXExporter(None)
-from cachetools import TTLCache
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
 
@@ -199,9 +199,7 @@ def register_routes(app):
 
     @app.route("/trip_metrics")
     async def get_trip_metrics():
-        formatted_metrics = (
-            await bouncie_api.get_trip_metrics()
-        )  # Use bouncie_api from app
+        formatted_metrics = await bouncie_api.get_trip_metrics()
         return jsonify(formatted_metrics)
 
     @app.route("/export_gpx")
@@ -212,30 +210,9 @@ def register_routes(app):
         )
         filter_waco = request.args.get("filterWaco", "false").lower() == "true"
         waco_boundary = request.args.get("wacoBoundary", "city_limits")
-        try:
-            gpx_data = await gpx_exporter.export_to_gpx(
-                format_date(start_date),
-                format_date(end_date),
-                filter_waco,
-                waco_boundary,
-            )
-            if gpx_data is None:
-                logger.warning("No data found for GPX export")
-                return (
-                    jsonify({"error": "No data found for the specified date range"}),
-                    404,
-                )
-            return Response(
-                gpx_data,
-                mimetype="application/gpx+xml",
-                headers={"Content-Disposition": "attachment;filename=export.gpx"},
-            )
-        except Exception as e:
-            logger.error(f"Error in export_gpx: {str(e)}", exc_info=True)
-            return (
-                jsonify({"error": f"An error occurred while exporting GPX: {str(e)}"}),
-                500,
-            )
+        
+        task = export_gpx_task.delay(format_date(start_date), format_date(end_date), filter_waco, waco_boundary)
+        return jsonify({"task_id": task.id, "message": "GPX export started"}), 202
 
     @app.route("/search_location")
     async def search_location():
@@ -276,29 +253,18 @@ def register_routes(app):
 
     @app.route("/update_historical_data", methods=["POST"])
     async def update_historical_data():
-        async with app.processing_lock:
-            if app.is_processing:
-                return jsonify({"error": "Another process is already running"}), 429
-            try:
-                app.is_processing = True
-                logger.info("Starting historical data update process")
-                await geojson_handler.update_historical_data(fetch_all=True)
-                logger.info("Historical data update process completed")
-                return (
-                    jsonify({"message": "Historical data updated successfully!"}),
-                    200,
-                )
-            except Exception as e:
-                logger.error(f"An error occurred during the update process: {e}")
-                return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-            finally:
-                app.is_processing = False
+        task = update_historical_data_task.delay(fetch_all=True)
+        return jsonify({"task_id": task.id, "message": "Historical data update started"}), 202
 
     @app.route("/progress_geojson")
     async def get_progress_geojson():
         try:
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
-            progress_geojson = await geojson_handler.get_progress_geojson(waco_boundary)
+            if waco_boundary == "none":
+                # Handle the case where no boundary is selected
+                progress_geojson = await geojson_handler.get_progress_geojson(None)
+            else:
+                progress_geojson = await geojson_handler.get_progress_geojson(waco_boundary)
             return jsonify(progress_geojson)
         except Exception as e:
             logger.error(f"Error getting progress GeoJSON: {str(e)}", exc_info=True)
@@ -347,10 +313,10 @@ def register_routes(app):
             filter_waco = request.args.get("filterWaco", "false").lower() == "true"
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
             logger.info(
-                f"Fetching historical data for: {start_date} to {end_date}, filterWaco: {filter_waco}, wacoBoundary: {waco_boundary}"
+                f"Fetching historical data for: {start_date} to {end_date}, filterWaco: {filter_waco}, waco_boundary: {waco_boundary}"
             )
             waco_limits = None
-            if filter_waco:
+            if filter_waco and waco_boundary != "none":
                 waco_limits = await geojson_handler.load_waco_boundary(
                     waco_boundary
                 )  # Await the coroutine
@@ -378,8 +344,7 @@ def register_routes(app):
             if pin == app.config["PIN"]:
                 session["authenticated"] = True
                 return redirect(url_for("index"))
-            return await render_template(
-                "login.html", error="Invalid PIN. Please try again."
+            return await render_template("login.html", error="Invalid PIN. Please try again."
             )
         return await render_template("login.html")
 
@@ -458,3 +423,27 @@ def register_routes(app):
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    @app.route("/task_status/<task_id>")
+    async def task_status(task_id):
+        task = celery_app.AsyncResult(task_id)
+        if task.state == 'PENDING':
+            response = {
+                'state': task.state,
+                'status': 'Task is pending...'
+            }
+        elif task.state != 'FAILURE':
+            response = {
+                'state': task.state,
+                'status': task.info.get('status', '')
+            }
+            if 'result' in task.info:
+                response['result'] = task.info['result']
+        else:
+            response = {
+                'state': task.state,
+                'status': str(task.info)
+            }
+        return jsonify(response)
+
+    return app

@@ -4,10 +4,7 @@ const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
   L.latLng(31.7935, -96.8636)  // Northeast corner
 );
 const DEFAULT_WACO_BOUNDARY = 'less_goofy';
-// const DEFAULT_WACO_STREETS_OPACITY = 0.7;
-// const DEFAULT_WACO_STREETS_FILTER = 'all';
 const ALL_TIME_START_DATE = new Date(2020, 0, 1);
-// const MAX_HISTORICAL_DATA_LOAD_ATTEMPTS = 3;
 const PROGRESS_UPDATE_INTERVAL = 60000; // Update progress every minute
 const PROGRESS_DATA_UPDATE_INTERVAL = 300000; // Update progress data every 5 minutes
 const LIVE_DATA_AND_METRICS_UPDATE_INTERVAL = 3000; // Update live data and metrics every 3 seconds
@@ -38,7 +35,7 @@ let map = null;
 let wacoLimitsLayer = null;
 let progressLayer = null;
 let historicalDataLayer = null;
-const liveRoutePolyline = null;
+let liveRoutePolyline = null;
 let liveMarker = null;
 let playbackPolyline = null;
 let playbackMarker = null;
@@ -88,7 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (error) {
     handleError(error, 'initializing application');
   } finally {
-    hideLoading(); // Ensure loading screen is hidden regardless of success or failure
+    hideLoading();
   }
 });
 
@@ -97,7 +94,7 @@ function initMap() {
   return new Promise((resolve, reject) => {
     try {
       if (map) {
-        map.remove(); // Remove existing map if any
+        map.remove();
       }
       map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
@@ -164,8 +161,7 @@ async function initWacoLimitsLayer() {
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
 
-    // Wait for map to be initialized
-    await map; // This will wait for the Promise returned by initMap() to resolve
+    await map;
 
     if (wacoLimitsLayer && map.hasLayer(wacoLimitsLayer)) {
       map.removeLayer(wacoLimitsLayer);
@@ -192,7 +188,6 @@ async function initWacoLimitsLayer() {
 function updateWacoLimitsLayerVisibility() {
   const showWacoLimits = document.getElementById('wacoLimitsCheckbox').checked;
 
-  // Wait for map to be initialized
   if (map && showWacoLimits && !map.hasLayer(wacoLimitsLayer)) {
     wacoLimitsLayer.addTo(map);
   } else if (map && !showWacoLimits && map.hasLayer(wacoLimitsLayer)) {
@@ -203,7 +198,6 @@ function updateWacoLimitsLayerVisibility() {
 // Initialize the progress layer
 async function initProgressLayer() {
   try {
-    // Wait for map to be initialized
     await map;
 
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${DEFAULT_WACO_BOUNDARY}`);
@@ -226,7 +220,6 @@ async function initProgressLayer() {
 function updateProgressLayerVisibility() {
   const showProgressLayer = document.getElementById('progressLayerCheckbox').checked;
 
-  // Wait for map to be initialized
   if (map && showProgressLayer && !map.hasLayer(progressLayer)) {
     progressLayer.addTo(map);
   } else if (map && !showProgressLayer && map.hasLayer(progressLayer)) {
@@ -240,7 +233,6 @@ async function initWacoStreetsLayer() {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const streetsFilter = document.getElementById('streets-select').value;
 
-    // Wait for map to be initialized
     await map;
 
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
@@ -309,6 +301,7 @@ async function loadHistoricalData() {
     handleError(error, 'loading historical data');
   }
 }
+
 async function fetchHistoricalData(startDate = null, endDate = null) {
   try {
     const filterWaco = document.getElementById('filterWaco').checked;
@@ -331,13 +324,11 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
 
     const data = await response.json();
 
-    // Ensure data is in valid GeoJSON format
     if (!data.type || data.type !== 'FeatureCollection') {
       console.warn('Historical data missing "FeatureCollection" type. Correcting...');
       data.type = 'FeatureCollection';
     }
 
-    // Ensure each feature has a valid geometry
     data.features = data.features.filter(feature => 
       feature.geometry && 
       feature.geometry.type === 'LineString' && 
@@ -356,7 +347,6 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
 function updateWacoStreetsLayerVisibility() {
   const showWacoStreets = document.getElementById('wacoStreetsCheckbox').checked;
 
-  // Wait for map to be initialized
   if (map && showWacoStreets && !map.hasLayer(wacoStreetsLayer)) {
     wacoStreetsLayer.addTo(map);
   } else if (map && !showWacoStreets && map.hasLayer(wacoStreetsLayer)) {
@@ -376,7 +366,7 @@ async function loadLiveRouteData() {
       );
       
       if (coordinates.length > 0) {
-        liveRouteLayer = L.polyline(coordinates, {
+        liveRoutePolyline = L.polyline(coordinates, {
           color: 'red',
           weight: 5,
           opacity: 0.7,
@@ -386,7 +376,7 @@ async function loadLiveRouteData() {
         const lastCoord = coordinates[coordinates.length - 1];
         liveMarker = L.marker(lastCoord, {icon: RED_BLINKING_MARKER_ICON}).addTo(map);
         
-        map.fitBounds(liveRouteLayer.getBounds());
+        map.fitBounds(liveRoutePolyline.getBounds());
         showFeedback('Live route data loaded successfully', 'success');
       }
     }
@@ -412,6 +402,7 @@ function updateLiveData(liveData) {
     showFeedback('Invalid live data received', 'warning');
   }
 }
+
 // Update live data and metrics
 async function updateLiveDataAndMetrics() {
   if (liveDataFetchController) {
@@ -478,6 +469,7 @@ async function updateLiveDataAndMetrics() {
     liveDataFetchController = null;
   }
 }
+
 // Animate updates to the statistics panel
 function animateStatUpdates(metrics) {
   ['totalDistance', 'totalTime', 'maxSpeed', 'startTime', 'endTime'].forEach(id => {
@@ -502,7 +494,6 @@ async function updateProgress() {
         }, 1000);
       }
       
-      // Create and append sanitized elements instead of using innerHTML
       progressText.textContent = ''; // Clear existing content
       
       const lengthCoverage = document.createElement('p');
@@ -522,12 +513,12 @@ async function updateProgress() {
     console.error('Error fetching progress:', error);
   }
 }
+
 // Load progress data and update the progress layer
 async function loadProgressData() {
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
 
-    // Wait for map to be initialized
     await map;
 
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
@@ -556,7 +547,6 @@ async function loadWacoStreets() {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const streetsFilter = document.getElementById('streets-select').value;
 
-    // Wait for map to be initialized
     await map;
 
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
@@ -765,35 +755,17 @@ function filterRoutesBy(period) {
 
 // Export historical data to a GPX file
 async function exportToGPX() {
-  showLoading('Preparing GPX export...');
-  try {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const filterWaco = document.getElementById('filterWaco').checked;
-    const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  const filterWaco = document.getElementById('filterWaco').checked;
+  const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
 
-    const url = `/export_gpx?startDate=${startDate}&endDate=${endDate}&filterWaco=${filterWaco}&wacoBoundary=${wacoBoundary}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = downloadUrl;
-    a.download = 'export.gpx';
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(downloadUrl);
-    showFeedback('GPX export completed. Check your downloads.', 'success');
-  } catch (error) {
-    console.error('Error exporting GPX:', error);
-    showFeedback('Error exporting GPX. Please try again.', 'error');
-  } finally {
-    hideLoading();
-  }
+  await handleLongRunningTask('/export_gpx', {
+    startDate,
+    endDate,
+    filterWaco,
+    wacoBoundary
+  });
 }
 
 // Update the map with historical data
@@ -899,11 +871,11 @@ function enableFilterControls() {
       document.querySelectorAll(selector).forEach(el => el.disabled = false);
     });
 }
+
 // Update the visibility of the historical data layer based on checkbox state
 function updateHistoricalDataLayerVisibility() {
   const showHistoricalData = document.getElementById('historicalDataCheckbox').checked;
 
-  // Wait for map to be initialized
   if (map && showHistoricalData && historicalDataLayer && !map.hasLayer(historicalDataLayer)) {
     historicalDataLayer.addTo(map);
   } else if (map && !showHistoricalData && historicalDataLayer && map.hasLayer(historicalDataLayer)) {
@@ -928,9 +900,9 @@ function setupEventListeners() {
   // Waco Boundary Select Event Listener
   if (wacoBoundarySelectEl) {
     wacoBoundarySelectEl.addEventListener('change', async () => {
-      await initWacoLimitsLayer(); // Update Waco limits when boundary changes
-      await loadProgressData(); // Update progress layer with new boundary
-      await loadWacoStreets(); // Update Waco streets with new boundary
+      await initWacoLimitsLayer();
+      await loadProgressData();
+      await loadWacoStreets();
     });
   }
 
@@ -955,32 +927,16 @@ function setupEventListeners() {
   // Data Update Button
   const updateDataBtn = document.getElementById('updateDataBtn');
   if (updateDataBtn) {
-    updateDataBtn.addEventListener('click', handleBackgroundTask(async () => {
-      try {
-        const response = await fetch('/update_historical_data', { method: 'POST' });
-        const data = await response.json();
-        if (response.ok) {
-          showFeedback(data.message, 'success');
-          await Promise.all([
-            displayHistoricalData(),
-            updateProgress()
-          ]);
-        } else {
-          throw new Error(data.error);
-        }
-      } catch (error) {
-        throw new Error('Error updating historical data: ' + error.message);
-      }
-    }, 'Checking for new driving data...'));
+    updateDataBtn.addEventListener('click', updateHistoricalData);
   }
 
   // Clear Route Button
   const clearRouteBtn = document.getElementById('clearRouteBtn');
   if (clearRouteBtn) {
-    clearRouteBtn.addEventListener('click', handleBackgroundTask(() => {
+    clearRouteBtn.addEventListener('click', () => {
       clearLiveRoute();
       showFeedback('Live route cleared', 'info');
-    }, 'Clearing live route...'));
+    });
   }
 
   // Playback Controls
@@ -1049,7 +1005,7 @@ function setupEventListeners() {
         if (suggestions.length > 0) {
           suggestions.forEach(suggestion => {
             const suggestionElement = document.createElement('div');
-            suggestionElement.textContent = suggestion.address; // Safe insertion
+            suggestionElement.textContent = suggestion.address;
             suggestionElement.classList.add('animate__animated', 'animate__fadeIn');
             suggestionElement.addEventListener('click', () => {
               searchInput.value = suggestion.address;
@@ -1080,20 +1036,20 @@ function setupEventListeners() {
 
   if (toggleMapControlsBtn && mapControls) {
     toggleMapControlsBtn.addEventListener('click', () => {
-      mapControls.classList.toggle('show'); // Toggle the 'show' class to control visibility
+      mapControls.classList.toggle('show');
     });
   }
 
   // Export to GPX Button
   const exportToGPXBtn = document.getElementById('exportToGPXBtn');
   if (exportToGPXBtn) {
-    exportToGPXBtn.addEventListener('click', handleBackgroundTask(exportToGPX, 'Exporting to GPX...'));
+    exportToGPXBtn.addEventListener('click', exportToGPX);
   }
 
   // Clear Drawn Shapes Button
   const clearDrawnShapesBtn = document.getElementById('clearDrawnShapesBtn');
   if (clearDrawnShapesBtn) {
-    clearDrawnShapesBtn.addEventListener('click', handleBackgroundTask(clearDrawnShapes, 'Clearing drawn shapes...'));
+    clearDrawnShapesBtn.addEventListener('click', clearDrawnShapes);
   }
 
   // Reset Progress Button
@@ -1203,6 +1159,7 @@ async function fetchJSON(url, options = {}) {
 function fetchGeoJSON(url) {
   return fetchJSON(url);
 }
+
 // Display a feedback message
 function showFeedback(message, type = 'info', duration = FEEDBACK_DURATION) {
   const notificationList = document.getElementById('notification-list');
@@ -1277,7 +1234,7 @@ function checkQueuedTasks() {
 
 // Helper function to remove a layer from the map
 function removeLayer(layer) {
-  if (layer && map && map.hasLayer(layer)) { // Check if map is defined
+  if (layer && map && map.hasLayer(layer)) {
     map.removeLayer(layer);
   }
 }
@@ -1298,13 +1255,83 @@ function yesterday() {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 }
 
-function daysAgoDaysAgo(daysAgo) {
+function daysAgo(daysAgo) {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);
 }
 
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
+}
+
+// New function to handle long-running tasks
+async function handleLongRunningTask(endpoint, params = {}) {
+  showLoading('Starting task...');
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      pollTaskStatus(data.task_id);
+    } else {
+      throw new Error(data.error || 'An error occurred');
+    }
+  } catch (error) {
+    showFeedback(error.message, 'error');
+    hideLoading();
+  }
+}
+
+// Function to poll task status
+async function pollTaskStatus(taskId) {
+  try {
+    const response = await fetch(`/task_status/${taskId}`);
+    const data = await response.json();
+    
+    if (data.state === 'PENDING' || data.state === 'PROGRESS') {
+      showLoading(`Task in progress: ${data.status || 'Processing...'}`);
+      setTimeout(() => pollTaskStatus(taskId), 1000); // Poll every second
+    } else if (data.state === 'SUCCESS') {
+      showFeedback('Task completed successfully!', 'success');
+      hideLoading();
+      if (data.result) {
+        handleTaskResult(data.result);
+      }
+    } else {
+      throw new Error(data.status || 'Task failed');
+    }
+  } catch (error) {
+    showFeedback(error.message, 'error');
+    hideLoading();
+  }
+}
+
+// Function to handle task result
+function handleTaskResult(result) {
+  if (result.type === 'historical_data_update') {
+    displayHistoricalData();
+  } else if (result.type === 'gpx_export') {
+    // Trigger download of GPX file
+    const blob = new Blob([result.data], { type: 'application/gpx+xml' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = 'export.gpx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+}
+
+// Update historical data
+async function updateHistoricalData() {
+  await handleLongRunningTask('/update_historical_data');
 }
 
 // Expose functions for debugging (optional)
@@ -1326,5 +1353,6 @@ window.mapApp = {
   adjustPlaybackSpeed,
   showFeedback,
   showLoading,
-  hideLoading
+  hideLoading,
+  updateHistoricalData
 };

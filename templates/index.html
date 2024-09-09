@@ -80,7 +80,7 @@
                     <div class="filter-row">
                         <div class="filter-item">
                             <label for="startDate">Start Date:</label>
-                            <input type="date" id="startDate" value="{{ last_month_start }}"> 
+                            <input type="date" id="startDate" value="{{ last_month_start }}">
                         </div>
                         <div class="filter-item">
                             <label for="endDate">End Date:</label>
@@ -206,6 +206,14 @@
         <p class="loading-text">Loading...</p>
     </div>
 
+    <div id="notification-icon" class="notification-icon">
+        <span id="notification-count" class="notification-count">0</span>
+    </div>
+    <div id="notification-panel" class="notification-panel">
+        <h3>Notifications</h3>
+        <ul id="notification-list"></ul>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turf/6.5.0/turf.min.js"></script>
@@ -246,11 +254,3 @@
     </script>
 </body>
 </html>
-
-<div id="notification-icon" class="notification-icon">
-    <span id="notification-count" class="notification-count">0</span>
-</div>
-<div id="notification-panel" class="notification-panel">
-    <h3>Notifications</h3>
-    <ul id="notification-list"></ul>
-</div>

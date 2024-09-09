@@ -6,7 +6,7 @@ import yaml
 import aiofiles
 import geopandas as gpd
 from rtree import index
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -108,17 +108,26 @@ class WacoStreetsAnalyzer:
         segments = []
         for idx, row in self.streets_gdf.iterrows():
             if isinstance(row.geometry, LineString):
-                coords = list(row.geometry.coords)
-                for i in range(len(coords) - 1):
-                    segment = LineString([coords[i], coords[i + 1]])
-                    segments.append(
-                        {
-                            "geometry": segment,
-                            "street_id": row.street_id,
-                            "segment_id": f"{row.street_id}_{i}",
-                        }
-                    )
+                segments.extend(self._process_linestring(row.geometry, row.street_id))
+            elif isinstance(row.geometry, MultiLineString):
+                for line in row.geometry.geoms:
+                    segments.extend(self._process_linestring(line, row.street_id))
+            else:
+                logging.warning(f"Unsupported geometry type for street_id {row.street_id}: {type(row.geometry)}")
+        
         return gpd.GeoDataFrame(segments, crs=self.streets_gdf.crs)
+
+    def _process_linestring(self, linestring, street_id):
+        segments = []
+        coords = list(linestring.coords)
+        for i in range(len(coords) - 1):
+            segment = LineString([coords[i], coords[i + 1]])
+            segments.append({
+                "geometry": segment,
+                "street_id": street_id,
+                "segment_id": f"{street_id}_{i}",
+            })
+        return segments
 
     async def _save_to_cache(self):
         try:
@@ -236,7 +245,7 @@ class WacoStreetsAnalyzer:
             return {"type": "FeatureCollection", "features": []}
 
         waco_limits = None
-        if waco_boundary != "none":
+        if waco_boundary and waco_boundary != "none":
             waco_limits = await asyncio.to_thread(
                 gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
             )
@@ -278,7 +287,7 @@ class WacoStreetsAnalyzer:
             return "{}"
 
         waco_limits = None
-        if waco_boundary != "none":
+        if waco_boundary and waco_boundary != "none":
             waco_limits = await asyncio.to_thread(
                 gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
             )
@@ -309,7 +318,7 @@ class WacoStreetsAnalyzer:
             return None
 
         waco_limits = None
-        if waco_boundary != "none":
+        if waco_boundary and waco_boundary != "none":
             waco_limits = await asyncio.to_thread(
                 gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
             )

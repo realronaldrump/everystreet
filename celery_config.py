@@ -24,5 +24,16 @@ def init_celery(app):
         CELERY_RESULT_BACKEND=config.CELERY_RESULT_BACKEND
     )
     celery = make_celery(app)
-    celery.conf.update(broker_connection_retry_on_startup=True)
+    celery.conf.update(
+        broker_connection_retry_on_startup=True,
+        task_routes={
+            'update_historical_data_task': {'queue': 'historical_data'},
+            'export_gpx_task': {'queue': 'export'}
+        },
+        task_serializer='json',
+        accept_content=['json'],
+        result_serializer='json',
+        timezone='UTC',
+        enable_utc=True,
+    )
     return celery

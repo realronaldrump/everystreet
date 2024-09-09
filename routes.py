@@ -18,8 +18,8 @@ from gpx_exporter import GPXExporter
 from models import DateRange, HistoricalDataParams
 from tasks import load_historical_data_background, poll_bouncie_api
 from utils import geolocator, login_required
-from celery_tasks import update_historical_data_task, export_gpx_task, celery_app
-
+from celery_tasks import update_historical_data_task, export_gpx_task
+from celery_worker import celery as celery_app
 logger = logging.getLogger(__name__)
 import os
 from config import Config
@@ -205,15 +205,13 @@ def register_routes(app):
     @app.route("/export_gpx")
     async def export_gpx():
         start_date = request.args.get("startDate") or "2020-01-01"
-        end_date = request.args.get("endDate") or datetime.now(timezone.utc).strftime(
-            "%Y-%m-%d"
-        )
+        end_date = request.args.get("endDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
         filter_waco = request.args.get("filterWaco", "false").lower() == "true"
         waco_boundary = request.args.get("wacoBoundary", "city_limits")
         
         task = export_gpx_task.delay(format_date(start_date), format_date(end_date), filter_waco, waco_boundary)
         return jsonify({"task_id": task.id, "message": "GPX export started"}), 202
-
+        
     @app.route("/search_location")
     async def search_location():
         query = request.args.get("query")

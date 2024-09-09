@@ -40,10 +40,6 @@ async def create_app():
     app.secret_key = config.SECRET_KEY
     app.config["SESSION_TYPE"] = "filesystem"
 
-    # Initialize Celery
-    celery = init_celery(app)
-    app.celery = celery
-
     # Initialize app attributes
     app.historical_data_loaded = False
     app.historical_data_loading = False

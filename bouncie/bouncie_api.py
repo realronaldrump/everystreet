@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class BouncieAPI:
-    def __init__(self):
+    def __init__(self, config):
         self.client = BouncieClient()
         self.data_fetcher = DataFetcher(self.client)
         self.geocoder = Geocoder()

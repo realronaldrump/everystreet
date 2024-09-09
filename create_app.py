@@ -54,7 +54,7 @@ async def create_app():
     app.progress_lock = asyncio.Lock()
 
     # Initialize BouncieAPI (Single Instance)
-    app.bouncie_api = BouncieAPI()
+    app.bouncie_api = BouncieAPI(app.config)
     logger.info("BouncieAPI initialized successfully")
 
     # Initialize WacoStreetsAnalyzer

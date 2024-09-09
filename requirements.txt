@@ -31,3 +31,6 @@ hypercorn
 pylint
 pytest
 pytest-asyncio
+PyYAML
+snakeviz
+defusedxml

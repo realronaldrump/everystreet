@@ -4,11 +4,10 @@ const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
   L.latLng(31.7935, -96.8636)  // Northeast corner
 );
 const DEFAULT_WACO_BOUNDARY = 'less_goofy';
-const DEFAULT_WACO_STREETS_OPACITY = 0.7;
-const DEFAULT_WACO_STREETS_FILTER = 'all';
+// const DEFAULT_WACO_STREETS_OPACITY = 0.7;
+// const DEFAULT_WACO_STREETS_FILTER = 'all';
 const ALL_TIME_START_DATE = new Date(2020, 0, 1);
-const MAX_HISTORICAL_DATA_LOAD_ATTEMPTS = 3;
-const DATA_POLLING_INTERVAL = 1000; // Poll for live data every second
+// const MAX_HISTORICAL_DATA_LOAD_ATTEMPTS = 3;
 const PROGRESS_UPDATE_INTERVAL = 60000; // Update progress every minute
 const PROGRESS_DATA_UPDATE_INTERVAL = 300000; // Update progress data every 5 minutes
 const LIVE_DATA_AND_METRICS_UPDATE_INTERVAL = 3000; // Update live data and metrics every 3 seconds
@@ -35,22 +34,22 @@ const RED_MARKER_ICON = L.divIcon({
 });
 
 // Global variables
-let map;
-let wacoLimitsLayer;
-let progressLayer;
-let historicalDataLayer;
-let liveRoutePolyline;
-let liveMarker;
-let playbackPolyline;
-let playbackMarker;
-let wacoStreetsLayer;
-let drawnItems;
+let map = null;
+let wacoLimitsLayer = null;
+let progressLayer = null;
+let historicalDataLayer = null;
+const liveRoutePolyline = null;
+let liveMarker = null;
+let playbackPolyline = null;
+let playbackMarker = null;
+let wacoStreetsLayer = null;
+let drawnItems = null;
 let playbackSpeed = 1;
 let isPlaying = false;
 let currentCoordIndex = 0;
-let playbackAnimation;
+let playbackAnimation = null;
 let isProcessing = false;
-let searchMarker;
+let searchMarker = null;
 let liveDataFetchController = null; // AbortController for live data requests
 const processingQueue = [];
 
@@ -1201,10 +1200,9 @@ async function fetchJSON(url, options = {}) {
 }
 
 // Fetch GeoJSON data from a given URL
-async function fetchGeoJSON(url) {
+function fetchGeoJSON(url) {
   return fetchJSON(url);
 }
-
 // Display a feedback message
 function showFeedback(message, type = 'info', duration = FEEDBACK_DURATION) {
   const notificationList = document.getElementById('notification-list');

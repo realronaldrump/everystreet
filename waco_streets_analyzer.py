@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import pickle
-
+import yaml
 import aiofiles
 import geopandas as gpd
 from rtree import index
@@ -35,10 +35,11 @@ class WacoStreetsAnalyzer:
             for idx, geometry in enumerate(self.segments_gdf.geometry):
                 self.sindex.insert(idx, geometry.bounds)
             logging.info(
-                f"WacoStreetsAnalyzer initialized. Total streets: {len(self.streets_gdf)}, Total segments: {len(self.segments_gdf)}"
+                "WacoStreetsAnalyzer initialized. Total streets: %s, Total segments: %s",
+                len(self.streets_gdf), len(self.segments_gdf)
             )
         except Exception as e:
-            logging.error(f"Error during WacoStreetsAnalyzer initialization: {str(e)}")
+            logging.error("Error during WacoStreetsAnalyzer initialization: %s", str(e))
             raise
 
     async def load_data(self):
@@ -48,13 +49,13 @@ class WacoStreetsAnalyzer:
             else:
                 await self._process_and_cache_data()
         except Exception as e:
-            logging.error(f"Error in load_data: {str(e)}")
+            logging.error("Error in load_data: %s", str(e))
             raise
 
     async def _load_from_cache(self):
         try:
             async with aiofiles.open(self.cache_file, "rb") as f:
-                cache_data = pickle.loads(await f.read())
+                cache_data = yaml.load(await f.read(), Loader=yaml.FullLoader)
             self.streets_gdf = cache_data["streets_gdf"]
             self.segments_gdf = cache_data["segments_gdf"]
             self.traveled_segments = cache_data["traveled_segments"]
@@ -66,10 +67,12 @@ class WacoStreetsAnalyzer:
             ):
                 raise ValueError("Invalid data loaded from cache")
             logging.info(
-                f"Loaded data from cache. Total streets: {len(self.streets_gdf)}, Total segments: {len(self.segments_gdf)}"
+                "Loaded data from cache. Total streets: %s, Total segments: %s",
+                len(self.streets_gdf),
+                len(self.segments_gdf)
             )
         except Exception as e:
-            logging.error(f"Error loading from cache: {str(e)}")
+            logging.error("Error loading from cache: %s", str(e))
             await self._process_and_cache_data()
 
     async def _process_and_cache_data(self):
@@ -93,10 +96,12 @@ class WacoStreetsAnalyzer:
 
             await self._save_to_cache()
             logging.info(
-                f"Processed and cached street data. Total streets: {len(self.streets_gdf)}, Total segments: {len(self.segments_gdf)}"
+                "Processed and cached street data. Total streets: %d, Total segments: %d",
+                len(self.streets_gdf),
+                len(self.segments_gdf)
             )
         except Exception as e:
-            logging.error(f"Error processing street data: {str(e)}")
+            logging.error("Error processing street data: %s", str(e))
             raise
 
     def _create_segments(self):
@@ -127,14 +132,14 @@ class WacoStreetsAnalyzer:
             async with aiofiles.open(self.cache_file, "wb") as f:
                 await f.write(cache_data)
         except Exception as e:
-            logging.error(f"Error saving to cache: {str(e)}")
+            logging.error("Error saving to cache: %s", str(e))
 
     async def update_progress(self, routes):
         if self.segments_gdf is None:
             logging.error("segments_gdf is None. Unable to update progress.")
             return
 
-        logging.info(f"Updating progress with {len(routes)} new routes...")
+        logging.info("Updating progress with %s new routes...", len(routes))
         if not routes:
             logging.warning("No routes provided for update_progress")
             return
@@ -159,7 +164,7 @@ class WacoStreetsAnalyzer:
             for _, route in gdf.iterrows():
                 if isinstance(route.geometry, LineString):
                     line = route.geometry
-                    logging.info(f"Processing route: {line.wkt[:100]}...")
+                    logging.info("Processing route: %s...", line.wkt[:100])
 
                     possible_matches_index = list(self.sindex.intersection(line.bounds))
                     possible_matches = self.segments_gdf.iloc[possible_matches_index]
@@ -169,19 +174,19 @@ class WacoStreetsAnalyzer:
                             self.traveled_segments.add(segment.segment_id)
 
                     if len(self.traveled_segments) == 0:
-                        logging.warning(f"Route did not intersect with any segments")
+                        logging.warning("Route did not intersect with any segments")
                     else:
                         logging.info(
-                            f"Route intersected with {len(self.traveled_segments)} segments"
+                            "Route intersected with %d segments", len(self.traveled_segments)
                         )
 
                 await asyncio.sleep(0)  # Yield control to the event loop
 
             await self._save_to_cache()
-            logging.info(f"Total traveled segments: {len(self.traveled_segments)}")
+            logging.info("Total traveled segments: %s", len(self.traveled_segments))
             logging.info("Progress update completed.")
         except Exception as e:
-            logging.error(f"Error processing routes: {str(e)}", exc_info=True)
+            logging.error("Error processing routes: %s", str(e), exc_info=True)
 
     def calculate_progress(self):
         logger.info("Calculating progress...")
@@ -327,5 +332,5 @@ class WacoStreetsAnalyzer:
         if self.streets_gdf is None:
             logger.error("streets_gdf is None. Unable to get all streets.")
             return None
-        logger.info(f"Retrieving all streets. Total streets: {len(self.streets_gdf)}")
+        logger.info("Retrieving all streets. Total streets: %d", len(self.streets_gdf))
         return self.streets_gdf

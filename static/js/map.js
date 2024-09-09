@@ -502,10 +502,20 @@ async function updateProgress() {
           progressBar.classList.remove('progress-bar-update');
         }, 1000);
       }
-      progressText.innerHTML = `
-        <strong>Length Coverage:</strong> ${data.coverage_percentage.toFixed(2)}% of Waco Streets Traveled<br>
-        <strong>Street Count:</strong> ${data.traveled_streets} / ${data.total_streets} (${(data.traveled_streets / data.total_streets * 100).toFixed(2)}%)
-      `;
+      
+      // Create and append sanitized elements instead of using innerHTML
+      progressText.textContent = ''; // Clear existing content
+      
+      const lengthCoverage = document.createElement('p');
+      lengthCoverage.innerHTML = '<strong>Length Coverage:</strong> ';
+      lengthCoverage.appendChild(document.createTextNode(`${data.coverage_percentage.toFixed(2)}% of Waco Streets Traveled`));
+      
+      const streetCount = document.createElement('p');
+      streetCount.innerHTML = '<strong>Street Count:</strong> ';
+      streetCount.appendChild(document.createTextNode(`${data.traveled_streets} / ${data.total_streets} (${(data.traveled_streets / data.total_streets * 100).toFixed(2)}%)`));
+      
+      progressText.appendChild(lengthCoverage);
+      progressText.appendChild(streetCount);
     } else {
       console.warn("Progress data is incomplete or DOM elements not found");
     }
@@ -513,7 +523,6 @@ async function updateProgress() {
     console.error('Error fetching progress:', error);
   }
 }
-
 // Load progress data and update the progress layer
 async function loadProgressData() {
   try {

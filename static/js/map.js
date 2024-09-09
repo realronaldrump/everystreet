@@ -1050,7 +1050,7 @@ function setupEventListeners() {
         if (suggestions.length > 0) {
           suggestions.forEach(suggestion => {
             const suggestionElement = document.createElement('div');
-            suggestionElement.textContent = suggestion.address;
+            suggestionElement.textContent = suggestion.address; // Safe insertion
             suggestionElement.classList.add('animate__animated', 'animate__fadeIn');
             suggestionElement.addEventListener('click', () => {
               searchInput.value = suggestion.address;

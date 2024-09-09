@@ -12,8 +12,6 @@ class Config(BaseSettings):
     ENABLE_GEOCODING: bool = False
     GOOGLE_MAPS_API: str
     DEBUG: bool = False
-    ANTHROPIC_API_KEY: str
-    OPENAI_API_KEY: str
     USERNAME: str
     PASSWORD: str
     SECRET_KEY: str

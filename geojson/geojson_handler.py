@@ -58,8 +58,7 @@ class GeoJSONHandler:
         return untraveled_streets.to_json()
 
     async def update_waco_streets_progress(self):
-        return await self.progress_updater.update_streets_progress(self)
-
+        return await self.progress_updater.update_streets_progress()
     def get_all_routes(self):
         logger.info(
             f"Retrieving all routes. Total features: {len(self.historical_geojson_features)}"

@@ -11,7 +11,14 @@ logger = logging.getLogger(__name__)
 
 class BouncieAPI:
     def __init__(self, config):
-        self.client = BouncieClient()
+        self.client = BouncieClient(
+            client_id=config["CLIENT_ID"],
+            client_secret=config["CLIENT_SECRET"],
+            redirect_uri=config["REDIRECT_URI"],
+            auth_code=config["AUTH_CODE"],
+            device_imei=config["DEVICE_IMEI"],
+            vehicle_id=config["VEHICLE_ID"],
+        )
         self.data_fetcher = DataFetcher(self.client)
         self.geocoder = Geocoder()
         self.trip_processor = TripProcessor()

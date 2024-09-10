@@ -14,6 +14,41 @@ const LIVE_DATA_AND_METRICS_UPDATE_INTERVAL = 3000; // Update live data and metr
 const FEEDBACK_DURATION = 5000; // Default duration for feedback messages
 const LIVE_DATA_TIMEOUT = 5000; // Timeout for live data requests (in milliseconds)
 
+let liveDataSocket = null;
+let metricsSocket = null;
+
+function setupWebSocketConnections() {
+  // Connect to WebSocket for live data
+  liveDataSocket = new WebSocket('ws://localhost:8080/ws/live_route');
+  liveDataSocket.onmessage = (event) => {
+    const liveData = JSON.parse(event.data);
+    updateLiveData(liveData);
+  };
+  liveDataSocket.onerror = (error) => {
+    console.error('Error in live data WebSocket:', error);
+    showFeedback('Error in live data WebSocket', 'error');
+  };
+  liveDataSocket.onclose = () => {
+    console.log('Live data WebSocket connection closed');
+  };
+
+  // Connect to WebSocket for trip metrics
+  metricsSocket = new WebSocket('ws://localhost:8080/ws/trip_metrics');
+  metricsSocket.onmessage = (event) => {
+    const metrics = JSON.parse(event.data);
+    updateMetrics(metrics);
+  };
+  metricsSocket.onerror = (error) => {
+    console.error('Error in metrics WebSocket:', error);
+    showFeedback('Error in metrics WebSocket', 'error');
+  };
+  metricsSocket.onclose = () => {
+    console.log('Metrics WebSocket connection closed');
+  };
+}
+
+setupWebSocketConnections();
+
 // Custom marker icons
 const BLUE_BLINKING_MARKER_ICON = L.divIcon({
   className: 'blinking-marker',
@@ -70,14 +105,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Historical data loading failed:', error);
         showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
       }),
-      loadLiveRouteData().catch(error => {
-        console.error('Live route data loading failed:', error);
-        showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
-      })
+      // loadLiveRouteData().catch(error => {
+      //   console.error('Live route data loading failed:', error);
+      //   showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
+      // })
     ]);
 
     // Set up data polling and updates
-    setInterval(updateLiveDataAndMetrics, LIVE_DATA_AND_METRICS_UPDATE_INTERVAL);
     setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
     setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
 
@@ -367,33 +401,57 @@ function updateWacoStreetsLayerVisibility() {
 // Load live route data from the server
 async function loadLiveRouteData() {
   try {
-    const response = await fetch('/api/live_route_data');
-    const data = await response.json();
-    if (data?.features?.[0]?.geometry?.coordinates?.length > 0) {
-      const coordinates = data.features[0].geometry.coordinates.filter(coord => 
-        Array.isArray(coord) && coord.length >= 2 && 
-        !isNaN(coord[0]) && !isNaN(coord[1])
-      );
+    // Create a WebSocket connection to your live route data WebSocket endpoint
+
+    liveDataSocket.onmessage = function (event) {
+      const data = JSON.parse(event.data);
       
-      if (coordinates.length > 0) {
-        liveRouteLayer = L.polyline(coordinates, {
-          color: 'red',
-          weight: 5,
-          opacity: 0.7,
-          pane: 'liveRoutePane'
-        }).addTo(map);
-        
-        const lastCoord = coordinates[coordinates.length - 1];
-        liveMarker = L.marker(lastCoord, {icon: RED_BLINKING_MARKER_ICON}).addTo(map);
-        
-        map.fitBounds(liveRouteLayer.getBounds());
-        showFeedback('Live route data loaded successfully', 'success');
+      if (data?.features?.[0]?.geometry?.coordinates?.length > 0) {
+        const coordinates = data.features[0].geometry.coordinates.filter(coord => 
+          Array.isArray(coord) && coord.length >= 2 && 
+          !isNaN(coord[0]) && !isNaN(coord[1])
+        );
+        let liveRouteLayer; 
+        if (coordinates.length > 0) {
+          // Update or create the polyline layer on the map with new coordinates
+          if (liveRouteLayer) {
+            liveRouteLayer.setLatLngs(coordinates);  // Update existing polyline
+          } else {
+            liveRouteLayer = L.polyline(coordinates, {
+              color: 'red',
+              weight: 5,
+              opacity: 0.7,
+              pane: 'liveRoutePane'
+            }).addTo(map);
+          }
+          
+          // Update the live marker position with the last coordinate
+          const lastCoord = coordinates[coordinates.length - 1];
+          if (liveMarker) {
+            liveMarker.setLatLng(lastCoord);  // Update marker position
+          } else {
+            liveMarker = L.marker(lastCoord, { icon: RED_BLINKING_MARKER_ICON }).addTo(map);
+          }
+          
+          // Adjust the map bounds to fit the live route
+          map.fitBounds(liveRouteLayer.getBounds());
+          showFeedback('Live route data loaded successfully', 'success');
+        }
       }
-    }
+    };
+
+    socket.onerror = function (error) {
+      handleError(error, 'loading live route data');
+    };
+
+    socket.onclose = function () {
+      console.log("WebSocket connection closed");
+    };
   } catch (error) {
     handleError(error, 'loading live route data');
   }
 }
+
 
 // Clear the live route from the map
 function clearLiveRoute() {
@@ -412,72 +470,24 @@ function updateLiveData(liveData) {
     showFeedback('Invalid live data received', 'warning');
   }
 }
-// Update live data and metrics
-async function updateLiveDataAndMetrics() {
-  if (liveDataFetchController) {
-    liveDataFetchController.abort();
-  }
 
-  liveDataFetchController = new AbortController();
-  const signal = liveDataFetchController.signal;
-
-  try {
-    const liveDataPromise = fetchJSON('/live_data', { signal });
-    const metricsPromise = fetchJSON('/trip_metrics');
-
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Live data request timed out')), LIVE_DATA_TIMEOUT);
+function updateMetrics(metrics) {
+  if (metrics && Object.keys(metrics).length > 0) {
+    Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
+      document.getElementById('totalDistance').textContent = `${deviceMetrics.total_distance.toFixed(2)} miles`;
+      document.getElementById('totalTime').textContent = deviceMetrics.total_time;
+      document.getElementById('maxSpeed').textContent = `${deviceMetrics.max_speed.toFixed(2)} mph`;
+      document.getElementById('startTime').textContent = new Date(deviceMetrics.start_time).toLocaleString();
+      document.getElementById('endTime').textContent = new Date(deviceMetrics.end_time).toLocaleString();
     });
-
-    const [liveData, metrics] = await Promise.race([
-      Promise.all([liveDataPromise, metricsPromise]),
-      timeoutPromise
-    ]);
-
-    console.log('Live data:', liveData);
-    console.log('Metrics:', metrics);
-
-    if (liveData && !liveData.error) {
-      Object.entries(liveData).forEach(([imei, data]) => {
-        updateLiveData(imei, data);
-        
-        // Update UI elements for live data
-        document.getElementById('lastUpdated').textContent = new Date(data.timestamp * 1000).toLocaleString();
-        document.getElementById('speed').textContent = `${data.speed.toFixed(2)} mph`;
-        document.getElementById('location').textContent = `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`;
-      });
-    } else {
-      console.error('Error fetching live data:', liveData?.error || 'No data received');
-      showFeedback('Device offline or no live data available', 'warning');
-    }
-
-    // Update trip metrics
-    if (metrics && Object.keys(metrics).length > 0) {
-      Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
-        document.getElementById('totalDistance').textContent = `${deviceMetrics.total_distance.toFixed(2)} miles`;
-        document.getElementById('totalTime').textContent = deviceMetrics.total_time;
-        document.getElementById('maxSpeed').textContent = `${deviceMetrics.max_speed.toFixed(2)} mph`;
-        document.getElementById('startTime').textContent = new Date(deviceMetrics.start_time).toLocaleString();
-        document.getElementById('endTime').textContent = new Date(deviceMetrics.end_time).toLocaleString();
-      });
-    } else {
-      console.warn('No metrics data received');
-    }
-
-    // Animate the updates
-    animateStatUpdates(metrics);
-
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('Live data request aborted');
-    } else {
-      console.error('Error updating live data and metrics:', error);
-      showFeedback('Error updating live data and metrics', 'error');
-    }
-  } finally {
-    liveDataFetchController = null;
+  } else {
+    console.warn('No metrics data received');
   }
+
+  // Animate the updates
+  animateStatUpdates(metrics);
 }
+
 // Animate updates to the statistics panel
 function animateStatUpdates(metrics) {
   ['totalDistance', 'totalTime', 'maxSpeed', 'startTime', 'endTime'].forEach(id => {

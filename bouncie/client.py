@@ -7,13 +7,13 @@ logger = logging.getLogger(__name__)
 
 
 class BouncieClient:
-    def __init__(self):
-        self.client_id = os.getenv("CLIENT_ID")
-        self.client_secret = os.getenv("CLIENT_SECRET")
-        self.redirect_uri = os.getenv("REDIRECT_URI")
-        self.auth_code = os.getenv("AUTH_CODE")
-        self.device_imei = os.getenv("DEVICE_IMEI")
-        self.vehicle_id = os.getenv("VEHICLE_ID")
+    def __init__(self, client_id, client_secret, redirect_uri, auth_code, device_imei, vehicle_id):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.redirect_uri = redirect_uri
+        self.auth_code = auth_code
+        self.device_imei = device_imei
+        self.vehicle_id = vehicle_id
 
         if not all(
             [

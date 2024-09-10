@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 from datetime import date, datetime, timezone
+from time import time
+
 
 from cachetools import TTLCache
 from quart import (Response, jsonify, redirect, render_template, request,
@@ -134,18 +136,6 @@ def register_routes(app):
             logging.error(f"Error in get_waco_streets: {str(e)}", exc_info=True)
             return jsonify({"error": str(e)}), 500
 
-    @app.websocket("/ws/live_route")
-    async def ws_live_route():
-        try:
-            while True:
-                async with app.live_route_lock:
-                    data = app.live_route_data
-                await websocket.send(json.dumps(data))
-                await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            # Handle WebSocket disconnection
-            pass
-
     @app.route("/update_progress", methods=["POST"])
     async def update_progress():
         async with app.progress_lock:
@@ -180,10 +170,32 @@ def register_routes(app):
         async with app.live_route_lock:
             return jsonify(getattr(app, "latest_bouncie_data", {}))
 
-    @app.route("/live_route", methods=["GET"])
-    async def live_route():
-        async with app.live_route_lock:
-            return jsonify(app.live_route_data)
+    @app.websocket("/ws/live_route")
+    async def ws_live_route():
+      try:
+        last_sent_time = 0  # Initialize to track the last time data was sent
+
+        while True:
+            current_time = time()  # Get the current timestamp
+
+            # Calculate the time difference since the last update
+            time_diff = current_time - last_sent_time
+
+            if time_diff >= 3:  # Check if at least 3 seconds have passed
+                async with app.live_route_lock:
+                    data = app.live_route_data
+
+                # Send the live route data to the client over the WebSocket connection
+                await websocket.send(json.dumps(data))
+
+                # Update the last_sent_time to the current time
+                last_sent_time = current_time
+
+            # Wait a small amount of time before the next check, e.g., 1 second
+            await asyncio.sleep(1)
+      except asyncio.CancelledError:
+        # Handle WebSocket disconnection
+        pass
 
     @app.route("/historical_data_status")
     async def historical_data_status():
@@ -195,12 +207,35 @@ def register_routes(app):
                 }
             )
 
-    @app.route("/trip_metrics")
-    async def get_trip_metrics():
-        formatted_metrics = (
-            await bouncie_api.get_trip_metrics()
-        )  # Use bouncie_api from app
-        return jsonify(formatted_metrics)
+
+    @app.websocket("/ws/trip_metrics")
+    async def ws_trip_metrics():
+      try:
+        last_sent_time = 0  # Initialize to track the last time data was sent
+
+        while True:
+            current_time = time()  # Get the current timestamp
+
+            # Calculate the time difference since the last update
+            time_diff = current_time - last_sent_time
+
+            if time_diff >= 3:  # Check if at least 3 seconds have passed
+                async with app.live_route_lock:
+                    formatted_metrics = await app.bouncie_api.get_trip_metrics()
+
+                # Send the trip metrics to the client over the WebSocket connection
+                await websocket.send(json.dumps(formatted_metrics))
+
+                # Update the last_sent_time to the current time
+                last_sent_time = current_time
+
+            # Wait a small amount of time before the next check, e.g., 1 second
+            await asyncio.sleep(1)
+      except asyncio.CancelledError:
+        # Handle WebSocket disconnection
+        pass
+
+
 
     @app.route("/export_gpx")
     async def export_gpx():

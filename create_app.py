@@ -34,6 +34,7 @@ async def create_app():
     """
     app = cors(Quart(__name__))
     config = Config()
+    print(app.config)
     app.config.from_mapping(
         {k: v for k, v in config.dict().items() if k not in ["Config"]}
     )

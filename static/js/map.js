@@ -444,15 +444,28 @@ function clearLiveRoute() {
 // Update live data on the map
 function updateLiveData(liveData) {
   removeLayer(liveMarker);
-  if (liveData && typeof liveData.latitude === 'number' && typeof liveData.longitude === 'number') {
-    const latLng = [liveData.latitude, liveData.longitude];
-    liveMarker = createAnimatedMarker(latLng, { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
+
+  // Check if the GeoJSON contains the expected structure
+  if (liveData && liveData.features && liveData.features.length > 0) {
+    const feature = liveData.features[0]; // Get the first feature
+    const geometry = feature.geometry;
+
+    // Check if the geometry is a LineString and contains coordinates
+    if (geometry.type === 'LineString' && geometry.coordinates.length > 0) {
+      const firstCoordinate = geometry.coordinates[0]; // Get the first point of the LineString
+      const latLng = [firstCoordinate[1], firstCoordinate[0]]; // [latitude, longitude]
+      
+      // Create and add the live marker on the map
+      liveMarker = createAnimatedMarker(latLng, { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
+    } else {
+      console.warn('Invalid geometry received:', liveData);
+      showFeedback('Invalid geometry received', 'warning');
+    }
   } else {
     console.warn('Invalid live data received:', liveData);
     showFeedback('Invalid live data received', 'warning');
   }
 }
-
 function updateMetrics(metrics) {
   if (metrics && Object.keys(metrics).length > 0) {
     Object.entries(metrics).forEach(([imei, deviceMetrics]) => {

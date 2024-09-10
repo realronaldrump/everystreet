@@ -3,6 +3,8 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from shapely.geometry import shape, Point
+
 
 import aiofiles
 from dateutil import parser
@@ -52,18 +54,22 @@ class FileHandler:
 
     async def _update_single_file(self, filename, features):
         try:
-            async with aiofiles.open(filename, "r") as f:
-                try:
-                    existing_data = json.loads(await f.read())
-                    existing_features = existing_data.get("features", [])
-                except json.JSONDecodeError:
-                    logger.warning(
-                        f"File {filename} is corrupted, initializing empty features"
-                    )
-                    existing_features = []
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            try:
+                async with aiofiles.open(filename, "r") as f:
+                    try:
+                        existing_data = json.loads(await f.read())
+                        existing_features = existing_data.get("features", [])
+                    except json.JSONDecodeError:
+                        logger.warning(
+                            f"File {filename} is corrupted, initializing empty features"
+                        )
+                        existing_features = []
+            except FileNotFoundError:
+                logger.info(f"File {filename} not found, creating new file")
+                existing_features = []
 
             all_features = self._merge_features(existing_features, features)
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
             async with aiofiles.open(filename, "w") as f:
                 await f.write(
                     json.dumps(
@@ -83,7 +89,6 @@ class FileHandler:
             )
         except Exception as e:
             logger.error(f"Error writing to file {filename}: {str(e)}", exc_info=True)
-
     @staticmethod
     def _convert_ndarray_to_list(obj):
         import numpy as np
@@ -116,3 +121,39 @@ class FileHandler:
                 logger.error(f"Invalid timestamp format: {timestamp}")
                 return None
         return float(timestamp)
+
+    # Add this method to the FileHandler class in file_handler.py
+    async def filter_historical_data(self, start_date, end_date, waco_boundary, filter_waco):
+        filtered_features = []
+        for month_year, features in self.monthly_data.items():
+            for feature in features:
+                timestamp = self._parse_timestamp(feature['properties']['timestamp'])
+                if timestamp is None:
+                    continue
+                date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                if start_date <= date <= end_date:
+                    if not filter_waco or self._is_within_waco(feature, waco_boundary):
+                        filtered_features.append(feature)
+        return {
+            "type": "FeatureCollection",
+            "features": filtered_features
+        }
+
+    def _is_within_waco(self, feature, waco_boundary):
+        # Get the Waco boundary polygon
+        waco_polygon = self.waco_analyzer.get_waco_boundary(waco_boundary)
+        
+        # Extract coordinates from the feature
+        coordinates = feature['geometry']['coordinates']
+        
+        # For LineString features
+        if feature['geometry']['type'] == 'LineString':
+            return any(waco_polygon.contains(Point(coord)) for coord in coordinates)
+        
+        # For Point features
+        elif feature['geometry']['type'] == 'Point':
+            return waco_polygon.contains(Point(coordinates))
+        
+        # For other geometry types, you may need to implement additional logic
+        else:
+            return False

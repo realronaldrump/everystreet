@@ -41,6 +41,10 @@ async def create_app():
     app.secret_key = config.SECRET_KEY
     app.config["SESSION_TYPE"] = "filesystem"
 
+    # Create necessary directories
+    os.makedirs("static", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
+
     # Initialize app attributes
     app.historical_data_loaded = False
     app.historical_data_loading = False

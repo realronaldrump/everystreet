@@ -1,17 +1,14 @@
 import logging
+import numpy as np
 from datetime import datetime, timezone
-
 from geopy.distance import geodesic
 
 logger = logging.getLogger(__name__)
 
-
 class TripProcessor:
     @staticmethod
     def calculate_metrics(live_trip_data):
-        current_time = datetime.now(timezone.utc)
-        time_since_update = current_time - live_trip_data["last_updated"]
-
+        time_since_update = datetime.now(timezone.utc) - live_trip_data["last_updated"]
         if time_since_update.total_seconds() > 45:
             live_trip_data["data"] = []
 
@@ -21,20 +18,19 @@ class TripProcessor:
         start_time = None
         end_time = None
 
-        data = live_trip_data["data"]
-
-        for i in range(1, len(data)):
-            prev_point = data[i - 1]
-            curr_point = data[i]
+        for i in range(1, len(live_trip_data["data"])):
+            prev_point = live_trip_data["data"][i - 1]
+            curr_point = live_trip_data["data"][i]
 
             distance = geodesic(
                 (prev_point["latitude"], prev_point["longitude"]),
                 (curr_point["latitude"], curr_point["longitude"]),
             ).miles
-
             total_distance += distance
+
             time_diff = curr_point["timestamp"] - prev_point["timestamp"]
             total_time += time_diff
+
             max_speed = max(max_speed, curr_point["speed"])
 
             if start_time is None:
@@ -45,16 +41,8 @@ class TripProcessor:
             "total_distance": round(total_distance, 2),
             "total_time": TripProcessor._format_time(total_time),
             "max_speed": max_speed,
-            "start_time": (
-                datetime.fromtimestamp(start_time, timezone.utc).isoformat()
-                if start_time
-                else "N/A"
-            ),
-            "end_time": (
-                datetime.fromtimestamp(end_time, timezone.utc).isoformat()
-                if end_time
-                else "N/A"
-            ),
+            "start_time": datetime.fromtimestamp(start_time, timezone.utc).isoformat() if start_time else "N/A",
+            "end_time": datetime.fromtimestamp(end_time, timezone.utc).isoformat() if end_time else "N/A",
         }
 
         logger.info(f"Returning trip metrics: {formatted_metrics}")
@@ -79,23 +67,23 @@ class TripProcessor:
 
             coordinates = []
             timestamps = []
-
             for band in trip.get("bands", []):
                 for path in band.get("paths", []):
-                    if len(path[0]) >= 5:  # Check for lat, lon, timestamp at least
-                        for point in path:
-                            lat, lon, _, _, timestamp = point
-                            try:
-                                iso_timestamp = datetime.fromtimestamp(
-                                    timestamp, timezone.utc
-                                ).isoformat()
-                                coordinates.append([lon, lat])
-                                timestamps.append(iso_timestamp)
-                            except (TypeError, ValueError) as e:
-                                logger.error(
-                                    f"Invalid timestamp {timestamp}: {str(e)}. Skipping point."
-                                )
+                    path_array = np.array(path)
+                    if path_array.shape[1] >= 5:  # Check for lat, lon, timestamp at least
+                        for lat, lon, _, _, timestamp in path_array[:, [0, 1, 2, 3, 4]]:
+                            if timestamp is None:
+                                logger.warning(f"Skipping point with None timestamp: {path}")
                                 continue
+
+                            try:
+                                iso_timestamp = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+                            except (TypeError, ValueError) as e:
+                                logger.error(f"Invalid timestamp {timestamp}: {str(e)}. Skipping point.")
+                                continue
+
+                            coordinates.append([lon, lat])
+                            timestamps.append(iso_timestamp)
                     else:
                         logger.warning(f"Skipping invalid path: {path}")
 
@@ -106,21 +94,12 @@ class TripProcessor:
                     "properties": {
                         "timestamp": timestamps[0],
                         "end_timestamp": timestamps[-1],
-                        "timestamps": timestamps,
+                        "timestamps": timestamps
                     },
                 }
                 features.append(feature)
             else:
-                logger.warning(
-                    f"Skipping trip with insufficient data: coordinates={len(coordinates)}, timestamps={len(timestamps)}"
-                )
+                logger.warning(f"Skipping trip with insufficient data: coordinates={len(coordinates)}, timestamps={len(timestamps)}")
 
         logger.info(f"Created {len(features)} GeoJSON features from trip data")
         return features
-
-
-from datetime import datetime, timezone
-
-from geopy.distance import geodesic
-
-logger = logging.getLogger(__name__)

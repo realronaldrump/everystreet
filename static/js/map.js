@@ -3,7 +3,7 @@ const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
   L.latLng(31.3501, -97.4585), // Southwest corner
   L.latLng(31.7935, -96.8636)  // Northeast corner
 );
-const DEFAULT_WACO_BOUNDARY = 'less_goofy';
+const DEFAULT_WACO_BOUNDARY = 'city_limits';
 // const DEFAULT_WACO_STREETS_OPACITY = 0.7;
 // const DEFAULT_WACO_STREETS_FILTER = 'all';
 const ALL_TIME_START_DATE = new Date(2020, 0, 1);
@@ -351,40 +351,22 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
     const endDateParam = endDate || document.getElementById('endDate').value;
 
     const response = await fetch(
-      `/historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
+      `/api/filter_historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
       `&filterWaco=${filterWaco}&wacoBoundary=${wacoBoundary}`
     );
 
     if (!response.ok) {
-      if (response.status === 404) {
-        console.warn("No historical data found for the specified date range.");
-        return { type: "FeatureCollection", features: [] };
-      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-
-    // Ensure data is in valid GeoJSON format
-    if (!data.type || data.type !== 'FeatureCollection') {
-      console.warn('Historical data missing "FeatureCollection" type. Correcting...');
-      data.type = 'FeatureCollection';
-    }
-
-    // Ensure each feature has a valid geometry
-    data.features = data.features.filter(feature => 
-      feature.geometry && 
-      feature.geometry.type === 'LineString' && 
-      Array.isArray(feature.geometry.coordinates) &&
-      feature.geometry.coordinates.length > 1
-    );
-
-    return data;
+    return await response.json();
   } catch (error) {
-    handleError(error, 'fetching historical data');
+    console.error('Error fetching historical data:', error);
+    showFeedback('Error fetching historical data. Please try again.', 'error');
     return { type: "FeatureCollection", features: [] };
   }
 }
+
 
 // Update the visibility of the Waco streets layer based on checkbox state
 function updateWacoStreetsLayerVisibility() {
@@ -875,7 +857,12 @@ async function displayHistoricalData() {
 
   try {
     const data = await fetchHistoricalData();
-    updateMapWithHistoricalData(data);
+    if (data && data.features) {
+      updateMapWithHistoricalData(data);
+    } else {
+      showFeedback('No historical data available for the selected period.', 'info');
+    }
+    
 
     // Reload progress layer with the new boundary
     await loadProgressData();

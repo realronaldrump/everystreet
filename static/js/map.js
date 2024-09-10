@@ -131,7 +131,7 @@ function initMap() {
   return new Promise((resolve, reject) => {
     try {
       if (map) {
-        map.remove(); // Remove existing map if any
+        map.remove();
       }
       map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
@@ -444,28 +444,20 @@ function clearLiveRoute() {
 // Update live data on the map
 function updateLiveData(liveData) {
   removeLayer(liveMarker);
-
-  // Check if the GeoJSON contains the expected structure
-  if (liveData && liveData.features && liveData.features.length > 0) {
-    const feature = liveData.features[0]; // Get the first feature
-    const geometry = feature.geometry;
-
-    // Check if the geometry is a LineString and contains coordinates
-    if (geometry.type === 'LineString' && geometry.coordinates.length > 0) {
-      const firstCoordinate = geometry.coordinates[0]; // Get the first point of the LineString
-      const latLng = [firstCoordinate[1], firstCoordinate[0]]; // [latitude, longitude]
-      
-      // Create and add the live marker on the map
-      liveMarker = createAnimatedMarker(latLng, { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
-    } else {
-      console.warn('Invalid geometry received:', liveData);
-      showFeedback('Invalid geometry received', 'warning');
+  if (liveData && typeof liveData.latitude === 'number' && typeof liveData.longitude === 'number') {
+    const latLng = [liveData.latitude, liveData.longitude];
+    liveMarker = L.marker(latLng, { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
+    
+    if (!liveRoutePolyline) {
+      liveRoutePolyline = L.polyline([], { color: 'red', weight: 3 }).addTo(map);
     }
+    liveRoutePolyline.addLatLng(latLng);
   } else {
     console.warn('Invalid live data received:', liveData);
     showFeedback('Invalid live data received', 'warning');
   }
 }
+
 function updateMetrics(metrics) {
   if (metrics && Object.keys(metrics).length > 0) {
     Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
@@ -565,17 +557,23 @@ async function loadProgressData() {
     await map;
 
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
+    
     if (progressLayer && map) {
       map.removeLayer(progressLayer);
     }
-    progressLayer = L.geoJSON(data, {
-      style: (feature) => ({
-        color: feature.properties.traveled ? '#00ff00' : '#ff0000',
-        weight: 3,
-        opacity: 0.7
-      }),
-      pane: 'progressPane'
+
+    progressLayer = L.vectorGrid.slicer(data, {
+      rendererFactory: L.canvas.tile,
+      vectorTileLayerStyles: {
+        sliced: (properties) => ({
+          color: properties.traveled ? '#00ff00' : '#ff0000',
+          weight: 3,
+          opacity: 0.7
+        })
+      },
+      interactive: true
     });
+
     updateProgressLayerVisibility();
   } catch (error) {
     console.error('Error loading progress data:', error);
@@ -585,7 +583,6 @@ async function loadProgressData() {
 
 // Load Waco streets data and update the Waco streets layer
 async function loadWacoStreets() {
-  await initWacoStreetsLayer();
   try {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const streetsFilter = document.getElementById('streets-select').value;
@@ -594,17 +591,36 @@ async function loadWacoStreets() {
     await map;
 
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
+    
     if (wacoStreetsLayer && map) {
       map.removeLayer(wacoStreetsLayer);
     }
-    wacoStreetsLayer = L.geoJSON(data, {
-      style: {
-        color: '#808080',
-        weight: 1,
-        opacity: 0.7
+
+    wacoStreetsLayer = L.vectorGrid.slicer(data, {
+      rendererFactory: L.canvas.tile,
+      vectorTileLayerStyles: {
+        sliced: {
+          color: '#808080',
+          weight: 1,
+          opacity: 0.7
+        }
       },
-      pane: 'wacoStreetsPane'
+      interactive: true,
+      getFeatureId: function(f) {
+        return f.properties.name;
+      }
+    }).addTo(map);
+
+    wacoStreetsLayer.on('mouseover', (e) => {
+      const properties = e.layer.properties;
+      if (properties && properties.name) {
+        L.popup()
+          .setContent(properties.name)
+          .setLatLng(e.latlng)
+          .openOn(map);
+      }
     });
+
     updateWacoStreetsLayerVisibility();
     showFeedback('Waco streets displayed', 'success');
   } catch (error) {
@@ -834,58 +850,75 @@ async function exportToGPX() {
 function updateMapWithHistoricalData(data) {
   removeLayer(historicalDataLayer);
 
-  historicalDataLayer = L.geoJSON(data, {
-    style: {
-      color: '#0000FF',
-      weight: 3,
-      opacity: 0.7
-    },
-    onEachFeature: (feature, layer) => {
-      addRoutePopup(feature, layer);
-      layer.on('mouseover', function() {
-        this.setStyle({
-          color: '#FF0000',
-          weight: 5
-        });
-      });
-      layer.on('mouseout', function() {
-        this.setStyle({
-          color: '#0000FF',
-          weight: 3
-        });
-      });
-    },
-    pane: 'historicalDataPane'
+  const lines = data.features.map(feature => feature.geometry.coordinates);
+  
+  historicalDataLayer = L.glify.lines({
+    map: map,
+    data: lines,
+    color: (index, point) => [0, 0, 255],  // Blue color
+    opacity: 0.7,
+    weight: 3,
+    click: (e, feature, xy) => {
+      const popup = L.popup()
+        .setLatLng(e.latlng)
+        .setContent(createPopupContent(feature))
+        .openOn(map);
+    }
   });
 
-  if (map && !map.hasLayer(historicalDataLayer)) {
-    historicalDataLayer.addTo(map);
-  }
-
-  const totalDistance = calculateTotalDistance(data.features);
-  animateStatUpdate('totalHistoricalDistance', `${totalDistance.toFixed(2)} miles`);
-
-  showFeedback(`Displayed ${data.features.length} historical features`, 'success');
-
-  if (data.features.length > 0 && historicalDataLayer) {
-    const bounds = historicalDataLayer.getBounds();
+  if (data.features.length > 0) {
+    const bounds = L.latLngBounds(data.features.flatMap(f => f.geometry.coordinates));
     if (bounds.isValid()) {
       map.fitBounds(bounds);
     } else {
       console.warn('Invalid bounds for historical data');
     }
   }
-  
-  // Animate the historical data layer
-  if (historicalDataLayer) {
-    historicalDataLayer.eachLayer(function (layer) {
-      if (layer.getElement()) {
-        layer.getElement().classList.add('animate__animated', 'animate__fadeIn');
-      }
-    });
-  }
+
+  const totalDistance = calculateTotalDistance(data.features);
+  animateStatUpdate('totalHistoricalDistance', `${totalDistance.toFixed(2)} miles`);
+
+  showFeedback(`Displayed ${data.features.length} historical features`, 'success');
 }
 
+function createPopupContent(feature) {
+  const timestamp = feature.properties.timestamp;
+  let formattedDate = 'N/A';
+  let formattedTime = 'N/A';
+
+  if (timestamp) {
+    try {
+      const date = new Date(timestamp);
+      if (!isNaN(date.getTime())) {
+        formattedDate = date.toLocaleDateString();
+        formattedTime = date.toLocaleTimeString();
+      }
+    } catch (error) {
+      console.error('Error parsing date:', error);
+    }
+  }
+
+  const distance = calculateTotalDistance([feature]);
+
+  const popupContent = document.createElement('div');
+  popupContent.innerHTML = `
+    Date: ${formattedDate}<br>
+    Time: ${formattedTime}<br>
+    Distance: ${distance.toFixed(2)} miles<br>
+    <button class="playback-btn">Play Route</button>
+  `;
+  
+  popupContent.querySelector('.playback-btn').addEventListener('click', () => {
+    if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
+      startPlayback(feature.geometry.coordinates);
+    } else if (feature.geometry.type === 'MultiLineString') {
+      const validSegments = feature.geometry.coordinates.filter(segment => segment.length > 1);
+      validSegments.forEach(startPlayback);
+    }
+  });
+
+  return popupContent;
+}
 // Display historical data based on filter settings
 async function displayHistoricalData() {
   if (isProcessing) {

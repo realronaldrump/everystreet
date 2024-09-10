@@ -49,3 +49,5 @@ favicon.ico
 launch.geojson
 static/Waco-Streets-complete.geojsonnew_env/
 new_env
+
+geojson-convert.py

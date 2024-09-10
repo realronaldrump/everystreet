@@ -456,11 +456,23 @@ function updateLiveData(liveData) {
 function updateMetrics(metrics) {
   if (metrics && Object.keys(metrics).length > 0) {
     Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
-      document.getElementById('totalDistance').textContent = `${deviceMetrics.total_distance.toFixed(2)} miles`;
-      document.getElementById('totalTime').textContent = deviceMetrics.total_time;
-      document.getElementById('maxSpeed').textContent = `${deviceMetrics.max_speed.toFixed(2)} mph`;
-      document.getElementById('startTime').textContent = new Date(deviceMetrics.start_time).toLocaleString();
-      document.getElementById('endTime').textContent = new Date(deviceMetrics.end_time).toLocaleString();
+      if (deviceMetrics) {
+        if (deviceMetrics.total_distance !== undefined) {
+          document.getElementById('totalDistance').textContent = `${deviceMetrics.total_distance.toFixed(2)} miles`;
+        }
+        if (deviceMetrics.total_time !== undefined) {
+          document.getElementById('totalTime').textContent = deviceMetrics.total_time;
+        }
+        if (deviceMetrics.max_speed !== undefined) {
+          document.getElementById('maxSpeed').textContent = `${deviceMetrics.max_speed.toFixed(2)} mph`;
+        }
+        if (deviceMetrics.start_time) {
+          document.getElementById('startTime').textContent = new Date(deviceMetrics.start_time).toLocaleString();
+        }
+        if (deviceMetrics.end_time) {
+          document.getElementById('endTime').textContent = new Date(deviceMetrics.end_time).toLocaleString();
+        }
+      }
     });
   } else {
     console.warn('No metrics data received');
@@ -470,11 +482,28 @@ function updateMetrics(metrics) {
   animateStatUpdates(metrics);
 }
 
-// Animate updates to the statistics panel
+// Update the animateStatUpdates function as well
 function animateStatUpdates(metrics) {
-  ['totalDistance', 'totalTime', 'maxSpeed', 'startTime', 'endTime'].forEach(id => {
-    animateStatUpdate(id, metrics[id.toLowerCase()]);
-  });
+  if (metrics && Object.keys(metrics).length > 0) {
+    const deviceMetrics = Object.values(metrics)[0]; // Get the first device's metrics
+    if (deviceMetrics) {
+      if (deviceMetrics.total_distance !== undefined) {
+        animateStatUpdate('totalDistance', `${deviceMetrics.total_distance.toFixed(2)} miles`);
+      }
+      if (deviceMetrics.total_time !== undefined) {
+        animateStatUpdate('totalTime', deviceMetrics.total_time);
+      }
+      if (deviceMetrics.max_speed !== undefined) {
+        animateStatUpdate('maxSpeed', `${deviceMetrics.max_speed.toFixed(2)} mph`);
+      }
+      if (deviceMetrics.start_time) {
+        animateStatUpdate('startTime', new Date(deviceMetrics.start_time).toLocaleString());
+      }
+      if (deviceMetrics.end_time) {
+        animateStatUpdate('endTime', new Date(deviceMetrics.end_time).toLocaleString());
+      }
+    }
+  }
 }
 
 // Update the progress bar and text

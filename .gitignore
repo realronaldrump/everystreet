@@ -24,7 +24,7 @@ logs/
 
 # Generated data files
 static/historical_data*.gpx
-static/historical_data_*.geojson
+# static/historical_data_*.geojson
 live_route_data.geojson
 waco_streets_cache.pkl
 

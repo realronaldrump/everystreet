@@ -47,7 +47,8 @@ favicon.ico
 .vscode
 .vscode/launch.json
 launch.geojson
-static/Waco-Streets-complete.geojsonnew_env/
+static/Waco-Streets-complete.geojson
+new_env/
 new_env
 
 geojson-convert.py

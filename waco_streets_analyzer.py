@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 import pickle
-import yaml
 import aiofiles
 import geopandas as gpd
 from rtree import index
@@ -13,7 +12,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 class WacoStreetsAnalyzer:
     def __init__(self, streets_geojson_path):
         self.streets_geojson_path = streets_geojson_path
@@ -21,7 +19,7 @@ class WacoStreetsAnalyzer:
         self.streets_gdf = None
         self.segments_gdf = None
         self.traveled_segments = set()
-        self.snap_distance = 0.00001  # Increased for better matching
+        self.snap_distance = 0.00001
         self.sindex = None
         self.lock = asyncio.Lock()
 
@@ -55,7 +53,7 @@ class WacoStreetsAnalyzer:
     async def _load_from_cache(self):
         try:
             async with aiofiles.open(self.cache_file, "rb") as f:
-                cache_data = yaml.load(await f.read(), Loader=yaml.FullLoader)
+                cache_data = pickle.loads(await f.read())
             self.streets_gdf = cache_data["streets_gdf"]
             self.segments_gdf = cache_data["segments_gdf"]
             self.traveled_segments = cache_data["traveled_segments"]
@@ -90,10 +88,7 @@ class WacoStreetsAnalyzer:
             self.streets_gdf = self.streets_gdf.set_index(
                 "street_id", drop=False
             ).sort_index()
-
-            # Create segments
             self.segments_gdf = self._create_segments()
-
             await self._save_to_cache()
             logging.info(
                 "Processed and cached street data. Total streets: %d, Total segments: %d",
@@ -138,50 +133,39 @@ class WacoStreetsAnalyzer:
         if self.segments_gdf is None:
             logging.error("segments_gdf is None. Unable to update progress.")
             return
-
         logging.info("Updating progress with %s new routes...", len(routes))
         if not routes:
             logging.warning("No routes provided for update_progress")
             return
-
         valid_features = [
             feature
             for feature in routes
             if feature["geometry"]["type"] == "LineString"
             and len(feature["geometry"]["coordinates"]) > 1
         ]
-
         if not valid_features:
             logging.warning("No valid features to process")
             return
-
         try:
             gdf = await asyncio.to_thread(
                 gpd.GeoDataFrame.from_features, valid_features
             )
             gdf.set_crs(epsg=4326, inplace=True)
-
             for _, route in gdf.iterrows():
                 if isinstance(route.geometry, LineString):
                     line = route.geometry
                     logging.info("Processing route: %s...", line.wkt[:100])
-
                     possible_matches_index = list(self.sindex.intersection(line.bounds))
                     possible_matches = self.segments_gdf.iloc[possible_matches_index]
-
                     for _, segment in possible_matches.iterrows():
                         if line.distance(segment.geometry) <= self.snap_distance:
                             self.traveled_segments.add(segment.segment_id)
-
                     if len(self.traveled_segments) == 0:
                         logging.warning("Route did not intersect with any segments")
                     else:
                         logging.info(
                             "Route intersected with %d segments", len(self.traveled_segments)
                         )
-
-                await asyncio.sleep(0)  # Yield control to the event loop
-
             await self._save_to_cache()
             logging.info("Total traveled segments: %s", len(self.traveled_segments))
             logging.info("Progress update completed.")
@@ -199,7 +183,6 @@ class WacoStreetsAnalyzer:
                 "total_segments": 0,
                 "traveled_segments": 0,
             }
-
         total_segments = len(self.segments_gdf)
         traveled_segments = len(self.traveled_segments)
         total_streets = len(self.streets_gdf)
@@ -211,11 +194,9 @@ class WacoStreetsAnalyzer:
                 ]
             )
         )
-
         coverage_percentage = (
             (traveled_segments / total_segments) * 100 if total_segments > 0 else 0
         )
-
         return {
             "coverage_percentage": coverage_percentage,
             "total_streets": total_streets,
@@ -234,25 +215,21 @@ class WacoStreetsAnalyzer:
         if self.segments_gdf is None:
             logger.error("segments_gdf is None. Unable to generate progress GeoJSON.")
             return {"type": "FeatureCollection", "features": []}
-
         waco_limits = None
         if waco_boundary != "none":
             waco_limits = await asyncio.to_thread(
                 gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
             )
             waco_limits = waco_limits.geometry.unary_union
-
         self.segments_gdf["traveled"] = self.segments_gdf["segment_id"].isin(
             self.traveled_segments
         )
-
         if waco_limits is not None:
             filtered_segments = self.segments_gdf[
                 self.segments_gdf.intersects(waco_limits)
             ]
         else:
             filtered_segments = self.segments_gdf
-
         features = filtered_segments.apply(
             lambda row: {
                 "type": "Feature",
@@ -266,7 +243,6 @@ class WacoStreetsAnalyzer:
             },
             axis=1,
         ).tolist()
-
         return {"type": "FeatureCollection", "features": features}
 
     async def get_untraveled_streets(self, waco_boundary="city_limits"):
@@ -276,14 +252,12 @@ class WacoStreetsAnalyzer:
                 "streets_gdf or segments_gdf is None. Unable to get untraveled streets."
             )
             return "{}"
-
         waco_limits = None
         if waco_boundary != "none":
             waco_limits = await asyncio.to_thread(
                 gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
             )
             waco_limits = waco_limits.geometry.unary_union
-
         traveled_streets = set(
             self.segments_gdf[
                 self.segments_gdf["segment_id"].isin(self.traveled_segments)
@@ -292,12 +266,10 @@ class WacoStreetsAnalyzer:
         untraveled_streets = self.streets_gdf[
             ~self.streets_gdf["street_id"].isin(traveled_streets)
         ]
-
         if waco_limits is not None:
             untraveled_streets = untraveled_streets[
                 untraveled_streets.intersects(waco_limits)
             ]
-
         return untraveled_streets.to_json()
 
     async def get_street_network(self, waco_boundary="city_limits"):
@@ -307,25 +279,21 @@ class WacoStreetsAnalyzer:
                 "streets_gdf or segments_gdf is None. Unable to get street network."
             )
             return None
-
         waco_limits = None
         if waco_boundary != "none":
             waco_limits = await asyncio.to_thread(
                 gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
             )
             waco_limits = waco_limits.geometry.unary_union
-
         street_network = self.streets_gdf.copy()
         if waco_limits is not None:
             street_network = street_network[street_network.intersects(waco_limits)]
-
         traveled_streets = set(
             self.segments_gdf[
                 self.segments_gdf["segment_id"].isin(self.traveled_segments)
             ]["street_id"]
         )
         street_network["traveled"] = street_network["street_id"].isin(traveled_streets)
-
         return street_network
 
     def get_all_streets(self):

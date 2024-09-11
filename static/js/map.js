@@ -16,39 +16,70 @@ const LIVE_DATA_TIMEOUT = 5000; // Timeout for live data requests (in millisecon
 
 let liveDataSocket = null;
 let metricsSocket = null;
-
 function setupWebSocketConnections() {
-  // Connect to WebSocket for live data
   liveDataSocket = new WebSocket('ws://localhost:8080/ws/live_route');
   liveDataSocket.onmessage = (event) => {
     const liveData = JSON.parse(event.data);
-    updateLiveData(liveData);
-  };
-  liveDataSocket.onerror = (error) => {
-    console.error('Error in live data WebSocket:', error);
-    showFeedback('Error in live data WebSocket', 'error');
-  };
-  liveDataSocket.onclose = () => {
-    console.log('Live data WebSocket connection closed');
+    updateLiveRouteOnMap(liveData);
   };
 
-  // Connect to WebSocket for trip metrics
   metricsSocket = new WebSocket('ws://localhost:8080/ws/trip_metrics');
   metricsSocket.onmessage = (event) => {
     const metrics = JSON.parse(event.data);
     updateMetrics(metrics);
   };
-  metricsSocket.onerror = (error) => {
-    console.error('Error in metrics WebSocket:', error);
-    showFeedback('Error in metrics WebSocket', 'error');
-  };
-  metricsSocket.onclose = () => {
-    console.log('Metrics WebSocket connection closed');
-  };
+
+  // Error handling for WebSockets
+  [liveDataSocket, metricsSocket].forEach(socket => {
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      showFeedback('Error in WebSocket connection', 'error');
+    };
+    socket.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+  });
+}
+
+function updateLiveRouteOnMap(liveData) {
+  if (liveData && liveData.features && liveData.features.length > 0) {
+    const coordinates = liveData.features[0].geometry.coordinates;
+    if (coordinates.length > 0) {
+      if (!liveRoutePolyline) {
+        liveRoutePolyline = L.polyline(coordinates, {
+          color: 'red',
+          weight: 3,
+          opacity: 0.7
+        }).addTo(map);
+      } else {
+        liveRoutePolyline.setLatLngs(coordinates);
+      }
+
+      const lastCoord = coordinates[coordinates.length - 1];
+      if (liveMarker) {
+        liveMarker.setLatLng(lastCoord);
+      } else {
+        liveMarker = L.marker(lastCoord, { icon: RED_BLINKING_MARKER_ICON }).addTo(map);
+      }
+
+      map.fitBounds(liveRoutePolyline.getBounds());
+    }
+  }
+}
+
+function updateMetrics(metrics) {
+  if (metrics) {
+    document.getElementById('totalDistance').textContent = `${metrics.total_distance.toFixed(2)} miles`;
+    document.getElementById('totalTime').textContent = metrics.total_time;
+    document.getElementById('maxSpeed').textContent = `${metrics.max_speed.toFixed(2)} mph`;
+    document.getElementById('startTime').textContent = new Date(metrics.start_time).toLocaleString();
+    document.getElementById('endTime').textContent = new Date(metrics.end_time).toLocaleString();
+    
+    animateStatUpdates(metrics);
+  }
 }
 
 setupWebSocketConnections();
-
 // Custom marker icons
 const BLUE_BLINKING_MARKER_ICON = L.divIcon({
   className: 'blinking-marker',

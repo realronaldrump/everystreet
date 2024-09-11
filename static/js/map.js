@@ -4,26 +4,30 @@ const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
   L.latLng(31.7935, -96.8636)  // Northeast corner
 );
 const DEFAULT_WACO_BOUNDARY = 'city_limits';
-// const DEFAULT_WACO_STREETS_OPACITY = 0.7;
-// const DEFAULT_WACO_STREETS_FILTER = 'all';
 const ALL_TIME_START_DATE = new Date(2020, 0, 1);
-// const MAX_HISTORICAL_DATA_LOAD_ATTEMPTS = 3;
 const PROGRESS_UPDATE_INTERVAL = 60000; // Update progress every minute
 const PROGRESS_DATA_UPDATE_INTERVAL = 300000; // Update progress data every 5 minutes
 const LIVE_DATA_AND_METRICS_UPDATE_INTERVAL = 3000; // Update live data and metrics every 3 seconds
 const FEEDBACK_DURATION = 5000; // Default duration for feedback messages
 const LIVE_DATA_TIMEOUT = 5000; // Timeout for live data requests (in milliseconds)
 
+// Determine the WebSocket protocol based on the current page protocol
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+// Construct the WebSocket URL using the current hostname and port
+const wsBaseUrl = `${wsProtocol}//${window.location.host}`;
+
 let liveDataSocket = null;
 let metricsSocket = null;
+
 function setupWebSocketConnections() {
-  liveDataSocket = new WebSocket('ws://localhost:8080/ws/live_route');
+  liveDataSocket = new WebSocket(`${wsBaseUrl}/ws/live_route`);
   liveDataSocket.onmessage = (event) => {
     const liveData = JSON.parse(event.data);
     updateLiveRouteOnMap(liveData);
   };
 
-  metricsSocket = new WebSocket('ws://localhost:8080/ws/trip_metrics');
+  metricsSocket = new WebSocket(`${wsBaseUrl}/ws/trip_metrics`);
   metricsSocket.onmessage = (event) => {
     const metrics = JSON.parse(event.data);
     updateMetrics(metrics);
@@ -80,6 +84,7 @@ function updateMetrics(metrics) {
 }
 
 setupWebSocketConnections();
+
 // Custom marker icons
 const BLUE_BLINKING_MARKER_ICON = L.divIcon({
   className: 'blinking-marker',
@@ -104,7 +109,7 @@ let map = null;
 let wacoLimitsLayer = null;
 let progressLayer = null;
 let historicalDataLayer = null;
-const liveRoutePolyline = null;
+let liveRoutePolyline = null;
 let liveMarker = null;
 let playbackPolyline = null;
 let playbackMarker = null;
@@ -136,10 +141,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Historical data loading failed:', error);
         showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
       }),
-      // loadLiveRouteData().catch(error => {
-      //   console.error('Live route data loading failed:', error);
-      //   showFeedback('Error loading live route data. Some features may be unavailable.', 'error');
-      // })
     ]);
 
     // Set up data polling and updates
@@ -374,6 +375,7 @@ async function loadHistoricalData() {
     handleError(error, 'loading historical data');
   }
 }
+
 async function fetchHistoricalData(startDate = null, endDate = null) {
   try {
     const filterWaco = document.getElementById('filterWaco').checked;
@@ -385,7 +387,6 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
       `/api/filter_historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
       `&filterWaco=${filterWaco}&wacoBoundary=${wacoBoundary}`
     );
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -397,7 +398,6 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
     return { type: "FeatureCollection", features: [] };
   }
 }
-
 
 // Update the visibility of the Waco streets layer based on checkbox state
 function updateWacoStreetsLayerVisibility() {
@@ -414,8 +414,6 @@ function updateWacoStreetsLayerVisibility() {
 // Load live route data from the server
 async function loadLiveRouteData() {
   try {
-    // Create a WebSocket connection to your live route data WebSocket endpoint
-
     liveDataSocket.onmessage = function (event) {
       const data = JSON.parse(event.data);
       
@@ -453,18 +451,17 @@ async function loadLiveRouteData() {
       }
     };
 
-    socket.onerror = function (error) {
+    liveDataSocket.onerror = function (error) {
       handleError(error, 'loading live route data');
     };
 
-    socket.onclose = function () {
+    liveDataSocket.onclose = function () {
       console.log("WebSocket connection closed");
     };
   } catch (error) {
     handleError(error, 'loading live route data');
   }
 }
-
 
 // Clear the live route from the map
 function clearLiveRoute() {

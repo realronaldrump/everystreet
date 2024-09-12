@@ -397,7 +397,7 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
     const endDateParam = endDate || document.getElementById('endDate').value;
 
     const response = await fetch(
-      `/api/filter_historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
+      `/filtered_historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
       `&filterWaco=${filterWaco}&wacoBoundary=${wacoBoundary}`
     );
     if (!response.ok) {
@@ -408,7 +408,7 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
   } catch (error) {
     console.error('Error fetching historical data:', error);
     showFeedback('Error fetching historical data. Please try again.', 'error');
-    return { type: "FeatureCollection", features: [] };
+    return { type: "FeatureCollection", features: [] };  // Return empty GeoJSON
   }
 }
 
@@ -619,6 +619,13 @@ async function loadProgressData() {
   try {
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
     
+    // Check if map is defined and initialized
+    if (!map || typeof map.whenReady !== 'function') {
+      console.error('Map is not initialized');
+      showFeedback('Map is not ready. Please try again.', 'error');
+      return null;
+    }
+
     await map.whenReady();
 
     const newProgressLayer = L.vectorGrid.slicer(data, {
@@ -644,7 +651,7 @@ async function loadProgressData() {
   } catch (error) {
     console.error('Error loading progress data:', error);
     showFeedback('Error loading progress data. Please try again.', 'error');
-    throw error;
+    return null;
   }
 }
 // Load Waco streets data and update the Waco streets layer
@@ -918,35 +925,64 @@ async function exportToGPX() {
 function updateMapWithHistoricalData(data) {
   removeLayer(historicalDataLayer);
 
-  const lines = data.features.map(feature => feature.geometry.coordinates);
-  
-  historicalDataLayer = L.glify.lines({
-    map: map,
-    data: lines,
-    color: (index, point) => [0, 0, 255],  // Blue color
-    opacity: 0.7,
-    weight: 3,
-    click: (e, feature, xy) => {
-      const popup = L.popup()
-        .setLatLng(e.latlng)
-        .setContent(createPopupContent(feature))
-        .openOn(map);
-    }
-  });
-
-  if (data.features.length > 0) {
-    const bounds = L.latLngBounds(data.features.flatMap(f => f.geometry.coordinates));
-    if (bounds.isValid()) {
-      map.fitBounds(bounds);
-    } else {
-      console.warn('Invalid bounds for historical data');
-    }
+  if (!data || !data.features || data.features.length === 0) {
+    showFeedback('No historical data available for the selected period.', 'info');
+    return;
   }
 
-  const totalDistance = calculateTotalDistance(data.features);
-  animateStatUpdate('totalHistoricalDistance', `${totalDistance.toFixed(2)} miles`);
+  try {
+    if (L.glify && typeof L.glify.lines === 'function') {
+      const lines = data.features.map(feature => feature.geometry.coordinates);
+      
+      historicalDataLayer = L.glify.lines({
+        map: map,
+        data: lines,
+        color: (index, point) => [0, 0, 255],  // Blue color
+        opacity: 0.7,
+        weight: 3,
+        click: (e, feature, xy) => {
+          const popup = L.popup()
+            .setLatLng(e.latlng)
+            .setContent(createPopupContent(feature))
+            .openOn(map);
+        }
+      });
+    } else {
+      // Fallback to standard Leaflet GeoJSON layer
+      historicalDataLayer = L.geoJSON(data, {
+        style: {
+          color: '#0000FF',
+          weight: 3,
+          opacity: 0.7
+        },
+        onEachFeature: (feature, layer) => {
+          layer.on('click', (e) => {
+            L.popup()
+              .setLatLng(e.latlng)
+              .setContent(createPopupContent(feature))
+              .openOn(map);
+          });
+        }
+      }).addTo(map);
+    }
 
-  showFeedback(`Displayed ${data.features.length} historical features`, 'success');
+    if (data.features.length > 0) {
+      const bounds = L.latLngBounds(data.features.flatMap(f => f.geometry.coordinates.map(coord => L.latLng(coord[1], coord[0]))));
+      if (bounds.isValid()) {
+        map.fitBounds(bounds);
+      } else {
+        console.warn('Invalid bounds for historical data');
+      }
+    }
+
+    const totalDistance = calculateTotalDistance(data.features);
+    animateStatUpdate('totalHistoricalDistance', `${totalDistance.toFixed(2)} miles`);
+
+    showFeedback(`Displayed ${data.features.length} historical features`, 'success');
+  } catch (error) {
+    console.error('Error updating map with historical data:', error);
+    showFeedback('Error displaying historical data on the map. Please try again.', 'error');
+  }
 }
 
 function createPopupContent(feature) {
@@ -1005,10 +1041,12 @@ async function displayHistoricalData() {
     } else {
       showFeedback('No historical data available for the selected period.', 'info');
     }
-    
 
     // Reload progress layer with the new boundary
-    await loadProgressData();
+    const progressLayer = await loadProgressData();
+    if (progressLayer) {
+      showFeedback('Progress data loaded successfully', 'success');
+    }
 
     // Reload Waco streets layer with the new boundary and filter
     await loadWacoStreets();

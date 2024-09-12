@@ -122,7 +122,6 @@ class FileHandler:
                 return None
         return float(timestamp)
 
-    # Add this method to the FileHandler class in file_handler.py
     async def filter_historical_data(self, start_date, end_date, waco_boundary, filter_waco):
         filtered_features = []
         for month_year, features in self.monthly_data.items():

@@ -6,8 +6,6 @@
     <title>Every Street - Tracking Davis's Waco Adventure</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
-    <script src="https://unpkg.com/leaflet.vectorgrid@latest/dist/Leaflet.VectorGrid.bundled.js"></script>
-    <script src="https://unpkg.com/leaflet.glify"></script>
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
@@ -201,8 +199,19 @@
         <p class="loading-text">Loading...</p>
     </div>
 
+    <div id="notification-icon" class="notification-icon">
+        <span id="notification-count" class="notification-count">0</span>
+    </div>
+    <div id="notification-panel" class="notification-panel">
+        <h3>Notifications</h3>
+        <ul id="notification-list"></ul>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/leaflet.glify@3.0.2/dist/leaflet.glify.js"></script>
+    <script src="https://unpkg.com/leaflet.vectorgrid@latest/dist/Leaflet.VectorGrid.bundled.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turf/6.5.0/turf.min.js"></script>
     <script src="/static/js/map.js"></script>
     <script>
@@ -239,12 +248,5 @@
         // Initial play
         playCurrentSong();
     </script>
-<div id="notification-icon" class="notification-icon">
-    <span id="notification-count" class="notification-count">0</span>
-</div>
-<div id="notification-panel" class="notification-panel">
-    <h3>Notifications</h3>
-    <ul id="notification-list"></ul>
-</div>
 </body>
 </html>

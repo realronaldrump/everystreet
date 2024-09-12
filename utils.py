@@ -17,22 +17,53 @@ logger = logging.getLogger(__name__)
 def load_live_route_data():
     try:
         with open(LIVE_ROUTE_DATA_FILE, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+
+            # Ensure 'crs' is in the loaded data
+            if "crs" not in data:
+                data["crs"] = {
+                    "type": "name",
+                    "properties": {"name": "EPSG:4326"}
+                }
+
+            return data
     except FileNotFoundError:
         logger.warning(
             f"File not found: {LIVE_ROUTE_DATA_FILE}. Creating an empty GeoJSON."
         )
-        empty_geojson = {"type": "FeatureCollection", "features": []}
+        # Default GeoJSON structure with CRS
+        empty_geojson = {
+            "type": "FeatureCollection",
+            "crs": {
+                "type": "name",
+                "properties": {"name": "EPSG:4326"}
+            },
+            "features": []
+        }
         save_live_route_data(empty_geojson)
         return empty_geojson
     except json.JSONDecodeError:
         logger.error(
             f"Error decoding JSON from {LIVE_ROUTE_DATA_FILE}. File may be corrupted."
         )
-        return {"type": "FeatureCollection", "features": []}
+        return {
+            "type": "FeatureCollection",
+            "crs": {
+                "type": "name",
+                "properties": {"name": "EPSG:4326"}
+            },
+            "features": []
+        }
 
 
 def save_live_route_data(data):
+    # Ensure 'crs' is present in the data before saving
+    if "crs" not in data:
+        data["crs"] = {
+            "type": "name",
+            "properties": {"name": "EPSG:4326"}
+        }
+
     with open(LIVE_ROUTE_DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 

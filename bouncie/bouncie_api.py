@@ -62,11 +62,6 @@ class BouncieAPI:
     def create_geojson_features_from_trips(data):
         return TripProcessor.create_geojson_features_from_trips(data)
 
-    async def clear_trip_data(self):
-        self.live_trip_data = {"last_updated": datetime.now(timezone.utc), "data": []}
-        # Reset any ongoing trip data in the client if necessary
-        await self.client.reset_trip_data()
-        logger.info("Trip data cleared successfully")
 
     async def find_first_data_date(self):
         # Implement this method to find the first date with data

@@ -11,7 +11,6 @@ async def poll_bouncie_api(app, bouncie_api):
     while True:
         try:
             if app.clear_live_route:
-                await bouncie_api.clear_trip_data()  # Add this method to BouncieAPI
                 app.clear_live_route = False
                 continue
 

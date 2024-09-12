@@ -1,3 +1,8 @@
+// Ensure Leaflet is loaded before using it
+if (typeof L === 'undefined') {
+  console.error('Leaflet is not loaded. Make sure to include Leaflet before this script.');
+}
+
 // Global constants
 const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
   L.latLng(31.3501, -97.4585), // Southwest corner
@@ -17,6 +22,26 @@ const wsBaseUrl = `${wsProtocol}//${window.location.host}`;
 
 let liveDataSocket = null;
 let metricsSocket = null;
+
+// Global variables
+let map = null;
+let wacoLimitsLayer = null;
+let progressLayer = null;
+let historicalDataLayer = null;
+let liveRoutePolyline = null; // Changed from const to let
+let liveMarker = null;
+let playbackPolyline = null;
+let playbackMarker = null;
+let wacoStreetsLayer = null;
+let drawnItems = null;
+let playbackSpeed = 1;
+let isPlaying = false;
+let currentCoordIndex = 0;
+let playbackAnimation = null;
+let isProcessing = false;
+let searchMarker = null;
+let liveDataFetchController = null;
+const processingQueue = [];
 
 function setupWebSocketConnections() {
   liveDataSocket = new WebSocket(`${wsBaseUrl}/ws/live_route`);
@@ -47,23 +72,27 @@ function updateLiveRouteOnMap(liveData) {
   if (liveData && liveData.features && liveData.features.length > 0) {
     const coordinates = liveData.features[0].geometry.coordinates;
     if (coordinates.length > 0) {
+      // Convert coordinates to LatLng objects
+      const latLngs = coordinates.map(coord => L.latLng(coord[1], coord[0]));
+
       if (!liveRoutePolyline) {
-        liveRoutePolyline = L.polyline(coordinates, {
+        liveRoutePolyline = L.polyline(latLngs, {
           color: 'red',
           weight: 3,
           opacity: 0.7
         }).addTo(map);
       } else {
-        liveRoutePolyline.setLatLngs(coordinates);
+        liveRoutePolyline.setLatLngs(latLngs);
       }
 
-      const lastCoord = coordinates[coordinates.length - 1];
+      const lastCoord = latLngs[latLngs.length - 1];
       if (liveMarker) {
         liveMarker.setLatLng(lastCoord);
       } else {
         liveMarker = L.marker(lastCoord, { icon: RED_BLINKING_MARKER_ICON }).addTo(map);
       }
 
+      // Adjust the map view to fit the route
       map.fitBounds(liveRoutePolyline.getBounds());
     }
   }
@@ -102,26 +131,6 @@ const RED_MARKER_ICON = L.divIcon({
   html: '<div style="background-color: red; width: 100%; height: 100%; border-radius: 50%;"></div>'
 });
 
-// Global variables
-let map = null;
-let wacoLimitsLayer = null;
-let progressLayer = null;
-let historicalDataLayer = null;
-const liveRoutePolyline = null;
-let liveMarker = null;
-let playbackPolyline = null;
-let playbackMarker = null;
-let wacoStreetsLayer = null;
-let drawnItems = null;
-let playbackSpeed = 1;
-let isPlaying = false;
-let currentCoordIndex = 0;
-let playbackAnimation = null;
-let isProcessing = false;
-let searchMarker = null;
-let liveDataFetchController = null; // AbortController for live data requests
-const processingQueue = [];
-
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -148,6 +157,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Set up event listeners
     setupEventListeners();
 
+    // Set up WebSocket connections after map initialization
+    setupWebSocketConnections();
+
     showFeedback('Application initialized successfully', 'success');
   } catch (error) {
     handleError(error, 'initializing application');
@@ -155,6 +167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     hideLoading(); // Ensure loading screen is hidden regardless of success or failure
   }
 });
+
 
 // Initialize the Leaflet map
 function initMap() {
@@ -463,9 +476,19 @@ async function loadLiveRouteData() {
 
 // Clear the live route from the map
 function clearLiveRoute() {
-  removeLayer(liveRoutePolyline);
-  removeLayer(liveMarker);
-}
+  if (liveRoutePolyline) {
+    map.removeLayer(liveRoutePolyline);
+    liveRoutePolyline = null;
+  }
+  if (liveMarker) {
+    map.removeLayer(liveMarker);
+    liveMarker = null;
+  }
+
+  // Clear the live route data in the app instance
+  app.live_route_data = {"features": []}
+  }
+
 
 // Update live data on the map
 function updateLiveData(liveData) {
@@ -1037,9 +1060,9 @@ function setupEventListeners() {
   // Waco Boundary Select Event Listener
   if (wacoBoundarySelectEl) {
     wacoBoundarySelectEl.addEventListener('change', async () => {
-      await initWacoLimitsLayer(); // Update Waco limits when boundary changes
-      await loadProgressData(); // Update progress layer with new boundary
-      await loadWacoStreets(); // Update Waco streets with new boundary
+      await initWacoLimitsLayer();
+      await loadProgressData();
+      await loadWacoStreets();
     });
   }
 
@@ -1422,7 +1445,6 @@ window.mapApp = {
   initMap,
   loadHistoricalData,
   loadLiveRouteData,
-  updateLiveDataAndMetrics,
   updateProgress,
   loadProgressData,
   displayHistoricalData,

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 from utils import save_live_route_data
 
@@ -7,10 +8,14 @@ logger = logging.getLogger(__name__)
 
 
 async def poll_bouncie_api(app, bouncie_api):
+    last_active_time = datetime.now(timezone.utc)  # Initialize last active time
+
     while True:
         try:
             bouncie_data = await bouncie_api.get_latest_bouncie_data()
             if bouncie_data:
+                last_active_time = datetime.now(timezone.utc)  # Update last active time
+
                 async with app.live_route_lock:
                     if "features" not in app.live_route_data:
                         app.live_route_data["features"] = []
@@ -40,6 +45,12 @@ async def poll_bouncie_api(app, bouncie_api):
                         logger.debug(
                             "Duplicate point detected, not adding to live route"
                         )
+            else:  # No bouncie_data received
+                time_since_last_update = datetime.now(timezone.utc) - last_active_time
+                if time_since_last_update.total_seconds() > 600:  # 10 minutes of inactivity
+                    async with app.live_route_lock:
+                        app.live_route_data["features"] = []  # Clear route data
+                        logger.info("Live route data cleared due to inactivity.")
 
             await asyncio.sleep(1)
 

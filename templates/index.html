@@ -102,7 +102,7 @@
                 <button id="playPauseBtn">Play</button>
                 <button id="stopBtn">Stop</button>
                 <button id="clearRouteBtn">Clear Route</button>
-                <button id="centerOnLiveMarkerBtn">Center on Live Marker</button>
+                <button id="centerLiveMarkerBtn">Center on Live Marker</button>
                 <div class="speed-control">
                     <label for="playbackSpeed">Speed:</label>
                     <input type="range" id="playbackSpeed" min="0.1" max="5" step="0.1" value="1">
@@ -120,11 +120,11 @@
                         </div>
                         <div class="stat-card">
                             <h4>Speed</h4>
-                            <p id="speed">N/A</p>
+                            <p id="currentSpeed">N/A</p>
                         </div>
                         <div class="stat-card">
                             <h4>Location</h4>
-                            <p id="location">N/A</p>
+                            <p id="currentLocation">N/A</p>
                         </div>
                     </div>
                 </div>
@@ -239,9 +239,6 @@
         // Initial play
         playCurrentSong();
     </script>
-</body>
-</html>
-
 <div id="notification-icon" class="notification-icon">
     <span id="notification-count" class="notification-count">0</span>
 </div>
@@ -249,3 +246,5 @@
     <h3>Notifications</h3>
     <ul id="notification-list"></ul>
 </div>
+</body>
+</html>

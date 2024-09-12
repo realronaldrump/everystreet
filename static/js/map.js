@@ -79,7 +79,8 @@ function updateLiveRouteOnMap(liveData) {
         liveRoutePolyline = L.polyline(latLngs, {
           color: 'red',
           weight: 3,
-          opacity: 0.7
+          opacity: 0.7,
+          pane: 'liveRoutePane'
         }).addTo(map);
       } else {
         liveRoutePolyline.setLatLngs(latLngs);
@@ -89,7 +90,10 @@ function updateLiveRouteOnMap(liveData) {
       if (liveMarker) {
         liveMarker.setLatLng(lastCoord);
       } else {
-        liveMarker = L.marker(lastCoord, { icon: RED_BLINKING_MARKER_ICON }).addTo(map);
+        liveMarker = L.marker(lastCoord, { 
+          icon: RED_BLINKING_MARKER_ICON,
+          pane: 'liveRoutePane' // Add the live marker to the correct pane
+        }).addTo(map);
       }
     }
   }
@@ -179,6 +183,7 @@ function initMap() {
       map.createPane('progressPane').style.zIndex = 410;
       map.createPane('historicalDataPane').style.zIndex = 430;
       map.createPane('wacoStreetsPane').style.zIndex = 440;
+      map.createPane('liveRoutePane').style.zIndex = 450;
 
       // Add progress controls
       const progressControl = L.control({ position: 'bottomleft' });

@@ -43,6 +43,69 @@ let searchMarker = null;
 let liveDataFetchController = null;
 const processingQueue = [];
 
+async function clearAllBrowserStorage() {
+  console.log('Clearing all browser storage...');
+
+  // Clear localStorage
+  localStorage.clear();
+  console.log('localStorage cleared');
+
+  // Clear sessionStorage
+  sessionStorage.clear();
+  console.log('sessionStorage cleared');
+
+  // Clear cookies
+  const cookies = document.cookie.split(";");
+  for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i];
+      const eqPos = cookie.indexOf("=");
+      const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+  }
+  console.log('Cookies cleared');
+
+  // Clear cache storage
+  if ('caches' in window) {
+      try {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => caches.delete(name)));
+          console.log('Cache storage cleared');
+      } catch (error) {
+          console.error('Error clearing cache storage:', error);
+      }
+  }
+
+  // Clear IndexedDB
+  const databases = await indexedDB.databases();
+  databases.forEach(db => {
+      indexedDB.deleteDatabase(db.name);
+  });
+  console.log('IndexedDB cleared');
+
+  // Clear service worker caches
+  if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for(let registration of registrations) {
+          await registration.unregister();
+      }
+      console.log('Service worker caches cleared');
+  }
+}
+
+// Function to force a hard reload of the page
+function forceReload() {
+  clearAllBrowserStorage().then(() => {
+      console.log('All browser storage cleared. Reloading page...');
+      window.location.reload(true);
+  });
+}
+
+// Call clearAllBrowserStorage when the page is about to unload
+window.addEventListener('beforeunload', clearAllBrowserStorage);
+
+// Call clearAllBrowserStorage when the page loads to ensure a fresh start
+window.addEventListener('load', clearAllBrowserStorage);
+
 function setupWebSocketConnections() {
   liveDataSocket = new WebSocket(`${wsBaseUrl}/ws/live_route`);
   liveDataSocket.onmessage = (event) => {

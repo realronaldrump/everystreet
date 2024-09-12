@@ -20,7 +20,6 @@ from utils import TaskManager, load_live_route_data, logger
 from waco_streets_analyzer import WacoStreetsAnalyzer
 from routes import register_routes
 
-
 async def create_app():
     """
     Asynchronously creates and configures the Quart application.
@@ -53,7 +52,6 @@ async def create_app():
     app.live_route_data = load_live_route_data()
     app.clear_live_route = False
 
-
     # Asynchronous Locks
     app.historical_data_lock = asyncio.Lock()
     app.processing_lock = asyncio.Lock()
@@ -85,5 +83,12 @@ async def create_app():
         Any additional startup tasks can be added here.
         """
         pass
+
+    @app.after_request
+    async def add_header(response):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
+        return response
 
     return app

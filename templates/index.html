@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 </head>
 <body>
     <div id="app">
@@ -196,6 +199,7 @@
             </div>
             <div class="logout-container">
                 <button id="logoutBtn" class="logout-button">Logout</button>
+                <button id="forceReloadBtn">Force Reload</button>
             </div>
         </footer>
     </div>
@@ -253,6 +257,9 @@
 
         // Initial play
         playCurrentSong();
+    </script>
+    <script>
+        document.getElementById('forceReloadBtn').addEventListener('click', forceReload);
     </script>
 </body>
 </html>

@@ -9,7 +9,7 @@ from time import time
 
 from cachetools import TTLCache
 from quart import (Response, jsonify, redirect, render_template, request,
-                   session, url_for, websocket)
+                   session, url_for, websocket, make_response)
 
 from config import Config
 from date_utils import format_date, timedelta
@@ -17,6 +17,7 @@ from gpx_exporter import GPXExporter
 from models import DateRange, HistoricalDataParams
 from tasks import load_historical_data_background, poll_bouncie_api
 from utils import geolocator, login_required
+from functools import wraps
 
 logger = logging.getLogger(__name__)
 import os
@@ -42,6 +43,16 @@ from cachetools import TTLCache
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
 
+def no_cache(view_function):
+    @wraps(view_function)
+    async def no_cache_impl(*args, **kwargs):
+        response = await make_response(await view_function(*args, **kwargs))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
+        return response
+    return no_cache_impl
+    
 def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer
     geojson_handler = app.geojson_handler
@@ -425,6 +436,7 @@ def register_routes(app):
 
     @app.route("/")
     @login_required
+    @no_cache
     async def index():
         today = datetime.now().strftime("%Y-%m-%d")
         # Calculate the start date for the last month

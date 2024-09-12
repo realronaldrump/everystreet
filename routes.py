@@ -315,12 +315,14 @@ def register_routes(app):
             try:
                 app.is_processing = True
                 logger.info("Starting historical data update process")
-                await geojson_handler.update_historical_data(fetch_all=True)
+                
+                data = await request.get_json()
+                start_date = data.get('startDate')
+                end_date = data.get('endDate')
+                
+                await geojson_handler.update_historical_data(fetch_all=False, start_date=start_date, end_date=end_date)
                 logger.info("Historical data update process completed")
-                return (
-                    jsonify({"message": "Historical data updated successfully!"}),
-                    200,
-                )
+                return jsonify({"message": "Historical data updated successfully!"}), 200
             except Exception as e:
                 logger.error(f"An error occurred during the update process: {e}")
                 return jsonify({"error": f"An error occurred: {str(e)}"}), 500

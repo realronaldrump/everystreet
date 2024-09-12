@@ -89,10 +89,16 @@
                     </div>
                     <div class="filter-row">
                         <button id="applyFilterBtn">Apply Filter</button>
-                        <button id="updateDataBtn">Check for New Driving Data</button>
                         <button id="exportToGPXBtn">Export to GPX</button>
                         <button id="clearDrawnShapesBtn">Clear Drawn Shapes</button>
                     </div>
+                    <div class="filter-row">
+                        <div class="filter-item">
+                          <label for="dateRangeSlider">Date Range: <span id="dateRangeValue">30 days</span></label>
+                          <input type="range" id="dateRangeSlider" min="1" max="365" value="30">
+                        </div>
+                        <button id="updateDataBtn">Check for New Driving Data</button>
+                      </div>
                 </div>
             </section>
 

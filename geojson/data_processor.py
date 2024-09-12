@@ -7,8 +7,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import box
 
-from date_utils import (days_ago, format_date,  # Import from date_utils
-                        get_end_of_day, get_start_of_day)
+from date_utils import (days_ago, format_date, get_end_of_day, get_start_of_day)
 
 from .file_handler import FileHandler
 
@@ -16,18 +15,18 @@ logger = logging.getLogger(__name__)
 
 
 class DataProcessor:
-    def __init__(self, waco_analyzer, bouncie_api):  # Accept bouncie_api as a parameter
+    def __init__(self, waco_analyzer, bouncie_api):
         self.waco_analyzer = waco_analyzer
-        self.bouncie_api = bouncie_api  # Store the passed bouncie_api instance
+        self.bouncie_api = bouncie_api
         self.file_handler = FileHandler()
-        self.concurrency = 100  # Adjust this value based on your needs
+        self.concurrency = 100
 
-    async def update_and_process_data(self, handler, fetch_all=False):
+    async def update_and_process_data(self, handler, fetch_all=False, start_date=None, end_date=None):
         try:
             logger.info("Starting update_and_process_data")
 
             # Step 1: Fetch all historical data
-            await self.fetch_all_historical_data(handler, fetch_all)
+            await self.fetch_all_historical_data(handler, fetch_all, start_date, end_date)
 
             # Step 2: Process routes and update Waco streets progress
             await self.process_routes_and_update_progress(handler)
@@ -40,7 +39,7 @@ class DataProcessor:
             )
             raise
 
-    async def fetch_all_historical_data(self, handler, fetch_all=False):
+    async def fetch_all_historical_data(self, handler, fetch_all=False, start_date=None, end_date=None):
         async with handler.waco_analyzer.lock:
             try:
                 logger.info("Starting fetch_all_historical_data")
@@ -48,6 +47,9 @@ class DataProcessor:
                 if fetch_all:
                     start_date = datetime(2020, 8, 1, tzinfo=timezone.utc)
                     logger.info(f"Fetching all data starting from {start_date}")
+                elif start_date:
+                    start_date = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    logger.info(f"Fetching data starting from provided start date: {start_date}")
                 elif handler.historical_geojson_features:
                     latest_timestamp = max(
                         feature["properties"]["timestamp"]
@@ -66,7 +68,7 @@ class DataProcessor:
                         f"No historical features loaded, fetching data starting from first data date: {start_date}"
                     )
 
-                end_date = datetime.now(tz=timezone.utc)
+                end_date = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc) if end_date else datetime.now(tz=timezone.utc)
                 logger.info(f"Fetching data until {end_date}")
 
                 semaphore = asyncio.Semaphore(self.concurrency)
@@ -160,7 +162,6 @@ class DataProcessor:
     async def filter_features(
         self, handler, start_date, end_date, filter_waco, waco_limits, bounds=None
     ):
-        # Use get_start_of_day and get_end_of_day from date_utils
         start_datetime = get_start_of_day(start_date)
         end_datetime = get_end_of_day(end_date)
 
@@ -239,7 +240,6 @@ class DataProcessor:
 
     async def get_recent_data(self, handler):
         try:
-            # Use days_ago and format_date from date_utils
             yesterday = days_ago(1)
             filtered_features = await self.filter_features(
                 handler,

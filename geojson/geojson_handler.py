@@ -24,8 +24,8 @@ class GeoJSONHandler:
         await self.data_loader.load_data(self)
         await self.update_all_progress()
 
-    async def update_historical_data(self, fetch_all=False):
-        await self.data_processor.update_and_process_data(self, fetch_all)
+    async def update_historical_data(self, fetch_all=False, start_date=None, end_date=None):
+        await self.data_processor.update_and_process_data(self, fetch_all, start_date, end_date)
 
     async def filter_geojson_features(
         self, start_date, end_date, filter_waco, waco_limits, bounds=None

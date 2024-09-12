@@ -600,7 +600,7 @@ async function updateProgress() {
       lengthCoverage.appendChild(document.createTextNode(`${data.coverage_percentage.toFixed(2)}% of Waco Streets Traveled`));
       
       const streetCount = document.createElement('p');
-      streetCount.innerHTML = '<strong>Street Count:</strong> ';
+      streetCount.innerHTML = '<strong>Segment Count:</strong> ';
       streetCount.appendChild(document.createTextNode(`${data.traveled_streets} / ${data.total_streets} (${(data.traveled_streets / data.total_streets * 100).toFixed(2)}%)`));
       
       progressText.appendChild(lengthCoverage);
@@ -1097,6 +1097,7 @@ function setupEventListeners() {
   const wacoBoundarySelectEl = document.getElementById('wacoBoundarySelect');
   const filterWacoEl = document.getElementById('filterWaco');
   const applyFilterBtnEl = document.getElementById('applyFilterBtn');
+  
 
   if (startDateEl) startDateEl.addEventListener('change', displayHistoricalData);
   if (endDateEl) endDateEl.addEventListener('change', displayHistoricalData);
@@ -1130,12 +1131,22 @@ function setupEventListeners() {
   if (wacoLimitsCheckboxEl) wacoLimitsCheckboxEl.addEventListener('change', updateWacoLimitsLayerVisibility);
   if (progressLayerCheckboxEl) progressLayerCheckboxEl.addEventListener('change', updateProgressLayerVisibility);
 
-  // Data Update Button
+  // Initialize the date range slider
+  initializeDateRangeSlider();
+
+  // Update the "Check for New Driving Data" button event listener
   const updateDataBtn = document.getElementById('updateDataBtn');
   if (updateDataBtn) {
     updateDataBtn.addEventListener('click', handleBackgroundTask(async () => {
       try {
-        const response = await fetch('/update_historical_data', { method: 'POST' });
+        const dateRange = getSelectedDateRange();
+        const response = await fetch('/update_historical_data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(dateRange),
+        });
         const data = await response.json();
         if (response.ok) {
           showFeedback(data.message, 'success');
@@ -1304,6 +1315,7 @@ function setupEventListeners() {
       loadWacoStreets();
     });
   }
+  
 
   // Logout Button
   const logoutBtn = document.getElementById('logoutBtn');
@@ -1366,6 +1378,34 @@ function animateElement(element, animationClass) {
   setTimeout(() => {
     element.classList.remove('animate__animated', animationClass);
   }, 1000);
+}
+
+function initializeDateRangeSlider() {
+  const slider = document.getElementById('dateRangeSlider');
+  const valueDisplay = document.getElementById('dateRangeValue');
+  
+  slider.addEventListener('input', function() {
+    const days = this.value;
+    valueDisplay.textContent = days === '365' ? 'All Time' : `${days} days`;
+  });
+}
+
+function getSelectedDateRange() {
+  const days = document.getElementById('dateRangeSlider').value;
+  const endDate = new Date();
+  let startDate;
+  
+  if (days === '365') {
+    startDate = new Date(2020, 0, 1); // ALL_TIME_START_DATE
+  } else {
+    startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - parseInt(days) + 1);
+  }
+  
+  return {
+    startDate: formatDate(startDate),
+    endDate: formatDate(endDate)
+  };
 }
 
 // Fetch JSON data from a given URL

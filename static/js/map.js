@@ -110,11 +110,6 @@ function updateMetrics(metrics) {
 setupWebSocketConnections();
 
 // Custom marker icons
-const BLUE_BLINKING_MARKER_ICON = L.divIcon({
-  className: 'blinking-marker',
-  iconSize: [20, 20],
-  html: '<div style="background-color: blue; width: 100%; height: 100%; border-radius: 50%;"></div>'
-});
 
 const RED_BLINKING_MARKER_ICON = L.divIcon({
   className: 'blinking-marker animate__animated animate__bounce',
@@ -1304,9 +1299,7 @@ function hideLoading() {
 }
 
 // Create an animated marker
-function createAnimatedMarker(latLng, options = {}) {
-  return L.marker(latLng, { icon: BLUE_BLINKING_MARKER_ICON, ...options });
-}
+
 
 // Animate the update of a statistic element
 function animateStatUpdate(elementId, newValue) {

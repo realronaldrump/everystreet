@@ -181,7 +181,7 @@ def register_routes(app):
             # Calculate the time difference since the last update
             time_diff = current_time - last_sent_time
 
-            if time_diff >= 3:  # Check if at least 3 seconds have passed
+            if time_diff >= 1:  # Check if at least 1 second has passed
                 async with app.live_route_lock:
                     data = app.live_route_data
 
@@ -219,7 +219,7 @@ def register_routes(app):
             # Calculate the time difference since the last update
             time_diff = current_time - last_sent_time
 
-            if time_diff >= 3:  # Check if at least 3 seconds have passed
+            if time_diff >= 1:  # Check if at least 1 seconds have passed
                 async with app.live_route_lock:
                     formatted_metrics = await app.bouncie_api.get_trip_metrics()
 
@@ -491,3 +491,11 @@ def register_routes(app):
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    @app.route("/clear_live_route", methods=["POST"])
+    async def clear_live_route():
+        async with app.live_route_lock:
+            app.live_route_data = {"features": []}
+            app.clear_live_route = True
+        return jsonify({"message": "Live route cleared successfully"})
+

@@ -91,9 +91,6 @@ function updateLiveRouteOnMap(liveData) {
       } else {
         liveMarker = L.marker(lastCoord, { icon: RED_BLINKING_MARKER_ICON }).addTo(map);
       }
-
-      // Adjust the map view to fit the route
-      map.fitBounds(liveRoutePolyline.getBounds());
     }
   }
 }
@@ -480,14 +477,20 @@ function clearLiveRoute() {
     map.removeLayer(liveRoutePolyline);
     liveRoutePolyline = null;
   }
-  if (liveMarker) {
-    map.removeLayer(liveMarker);
-    liveMarker = null;
-  }
 
-  // Clear the live route data in the app instance
-  app.live_route_data = {"features": []}
-  }
+  // Send request to clear live route data on the server
+  fetch('/clear_live_route', { method: 'POST' })
+    .then(response => response.json())
+    .then(data => {
+      console.log(data.message);
+      showFeedback('Live route cleared', 'info');
+    })
+    .catch(error => {
+      console.error('Error clearing live route:', error);
+      showFeedback('Error clearing live route', 'error');
+    });
+}
+
 
 
 // Update live data on the map

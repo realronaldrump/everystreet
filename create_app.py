@@ -51,6 +51,8 @@ async def create_app():
     app.is_processing = False
     app.task_manager = TaskManager()
     app.live_route_data = load_live_route_data()
+    app.clear_live_route = False
+
 
     # Asynchronous Locks
     app.historical_data_lock = asyncio.Lock()

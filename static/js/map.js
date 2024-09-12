@@ -80,7 +80,7 @@ function updateLiveRouteOnMap(liveData) {
           color: 'red',
           weight: 3,
           opacity: 0.7,
-          pane: 'liveRoutePane'
+          pane: 'liveRoutePane' // Add the live route to the correct pane
         }).addTo(map);
       } else {
         liveRoutePolyline.setLatLngs(latLngs);
@@ -114,6 +114,11 @@ function updateMetrics(metrics) {
 setupWebSocketConnections();
 
 // Custom marker icons
+const BLUE_BLINKING_MARKER_ICON = L.divIcon({
+  className: 'blinking-marker',
+  iconSize: [20, 20],
+  html: '<div style="background-color: blue; width: 100%; height: 100%; border-radius: 50%;"></div>'
+});
 
 const RED_BLINKING_MARKER_ICON = L.divIcon({
   className: 'blinking-marker animate__animated animate__bounce',
@@ -183,7 +188,7 @@ function initMap() {
       map.createPane('progressPane').style.zIndex = 410;
       map.createPane('historicalDataPane').style.zIndex = 430;
       map.createPane('wacoStreetsPane').style.zIndex = 440;
-      map.createPane('liveRoutePane').style.zIndex = 450;
+      map.createPane('liveRoutePane').style.zIndex = 450; // Add pane for live route
 
       // Add progress controls
       const progressControl = L.control({ position: 'bottomleft' });
@@ -1304,7 +1309,9 @@ function hideLoading() {
 }
 
 // Create an animated marker
-
+function createAnimatedMarker(latLng, options = {}) {
+  return L.marker(latLng, { icon: BLUE_BLINKING_MARKER_ICON, ...options });
+}
 
 // Animate the update of a statistic element
 function animateStatUpdate(elementId, newValue) {

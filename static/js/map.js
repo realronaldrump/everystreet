@@ -7,9 +7,7 @@ const DEFAULT_WACO_BOUNDARY = 'city_limits';
 const ALL_TIME_START_DATE = new Date(2020, 0, 1);
 const PROGRESS_UPDATE_INTERVAL = 60000; // Update progress every minute
 const PROGRESS_DATA_UPDATE_INTERVAL = 300000; // Update progress data every 5 minutes
-const LIVE_DATA_AND_METRICS_UPDATE_INTERVAL = 3000; // Update live data and metrics every 3 seconds
 const FEEDBACK_DURATION = 5000; // Default duration for feedback messages
-const LIVE_DATA_TIMEOUT = 5000; // Timeout for live data requests (in milliseconds)
 
 // Determine the WebSocket protocol based on the current page protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -517,28 +515,35 @@ function updateMetrics(metrics) {
 
 // Update the animateStatUpdates function as well
 function animateStatUpdates(metrics) {
-  if (metrics && Object.keys(metrics).length > 0) {
-    const deviceMetrics = Object.values(metrics)[0]; // Get the first device's metrics
-    if (deviceMetrics) {
-      if (deviceMetrics.total_distance !== undefined) {
-        animateStatUpdate('totalDistance', `${deviceMetrics.total_distance.toFixed(2)} miles`);
-      }
-      if (deviceMetrics.total_time !== undefined) {
-        animateStatUpdate('totalTime', deviceMetrics.total_time);
-      }
-      if (deviceMetrics.max_speed !== undefined) {
-        animateStatUpdate('maxSpeed', `${deviceMetrics.max_speed.toFixed(2)} mph`);
-      }
-      if (deviceMetrics.start_time) {
-        animateStatUpdate('startTime', new Date(deviceMetrics.start_time).toLocaleString());
-      }
-      if (deviceMetrics.end_time) {
-        animateStatUpdate('endTime', new Date(deviceMetrics.end_time).toLocaleString());
-      }
-    }
-  }
-}
+  if (!metrics || Object.keys(metrics).length === 0) return;
 
+  const updateQueue = [];
+
+  Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
+    if (deviceMetrics) {
+      updateQueue.push(() => {
+        if (deviceMetrics.total_distance !== undefined) {
+          animateStatUpdate('totalDistance', `${deviceMetrics.total_distance.toFixed(2)} miles`);
+        }
+        if (deviceMetrics.total_time !== undefined) {
+          animateStatUpdate('totalTime', deviceMetrics.total_time);
+        }
+        if (deviceMetrics.max_speed !== undefined) {
+          animateStatUpdate('maxSpeed', `${deviceMetrics.max_speed.toFixed(2)} mph`);
+        }
+        if (deviceMetrics.start_time) {
+          animateStatUpdate('startTime', new Date(deviceMetrics.start_time).toLocaleString());
+        }
+        if (deviceMetrics.end_time) {
+          animateStatUpdate('endTime', new Date(deviceMetrics.end_time).toLocaleString());
+        }
+      });
+    }
+  });
+
+  // Execute updates sequentially
+  updateQueue.reduce((promise, update) => promise.then(update), Promise.resolve());
+}
 // Update the progress bar and text
 async function updateProgress() {
   try {
@@ -578,19 +583,14 @@ async function updateProgress() {
 }
 // Load progress data and update the progress layer
 async function loadProgressData() {
+  const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+
   try {
-    const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
-
-    // Wait for map to be initialized
-    await map;
-
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
     
-    if (progressLayer && map) {
-      map.removeLayer(progressLayer);
-    }
+    await map.whenReady();
 
-    progressLayer = L.vectorGrid.slicer(data, {
+    const newProgressLayer = L.vectorGrid.slicer(data, {
       rendererFactory: L.canvas.tile,
       vectorTileLayerStyles: {
         sliced: (properties) => ({
@@ -602,29 +602,31 @@ async function loadProgressData() {
       interactive: true
     });
 
+    if (progressLayer && map.hasLayer(progressLayer)) {
+      map.removeLayer(progressLayer);
+    }
+
+    progressLayer = newProgressLayer;
     updateProgressLayerVisibility();
+
+    return progressLayer;
   } catch (error) {
     console.error('Error loading progress data:', error);
     showFeedback('Error loading progress data. Please try again.', 'error');
+    throw error;
   }
 }
-
 // Load Waco streets data and update the Waco streets layer
 async function loadWacoStreets() {
+  const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+  const streetsFilter = document.getElementById('streets-select').value;
+
   try {
-    const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
-    const streetsFilter = document.getElementById('streets-select').value;
-
-    // Wait for map to be initialized
-    await map;
-
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
     
-    if (wacoStreetsLayer && map) {
-      map.removeLayer(wacoStreetsLayer);
-    }
+    await map.whenReady();
 
-    wacoStreetsLayer = L.vectorGrid.slicer(data, {
+    const newWacoStreetsLayer = L.vectorGrid.slicer(data, {
       rendererFactory: L.canvas.tile,
       vectorTileLayerStyles: {
         sliced: {
@@ -637,7 +639,14 @@ async function loadWacoStreets() {
       getFeatureId: function(f) {
         return f.properties.name;
       }
-    }).addTo(map);
+    });
+
+    if (wacoStreetsLayer && map.hasLayer(wacoStreetsLayer)) {
+      map.removeLayer(wacoStreetsLayer);
+    }
+
+    wacoStreetsLayer = newWacoStreetsLayer;
+    updateWacoStreetsLayerVisibility();
 
     wacoStreetsLayer.on('mouseover', (e) => {
       const properties = e.layer.properties;
@@ -649,14 +658,14 @@ async function loadWacoStreets() {
       }
     });
 
-    updateWacoStreetsLayerVisibility();
     showFeedback('Waco streets displayed', 'success');
+    return wacoStreetsLayer;
   } catch (error) {
     console.error('Error loading Waco streets:', error);
     showFeedback('Error loading Waco streets', 'error');
+    throw error;
   }
 }
-
 // Add a popup to a route feature
 function addRoutePopup(feature, layer) {
   const timestamp = feature.properties.timestamp;

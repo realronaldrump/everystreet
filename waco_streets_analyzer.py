@@ -7,8 +7,11 @@ import geopandas as gpd
 from rtree import index
 from shapely.geometry import LineString
 
+gpd.options.use_pygeos = True
+
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -24,20 +27,18 @@ class WacoStreetsAnalyzer:
         self.lock = asyncio.Lock()
 
     async def initialize(self):
-        logging.info("Initializing WacoStreetsAnalyzer...")
+        logger.info("Initializing WacoStreetsAnalyzer...")
         try:
             await self.load_data()
             if self.streets_gdf is None or self.streets_gdf.empty:
                 raise ValueError("streets_gdf is None or empty after load_data")
-            self.sindex = index.Index()
-            for idx, geometry in enumerate(self.segments_gdf.geometry):
-                self.sindex.insert(idx, geometry.bounds)
-            logging.info(
+            self.sindex = self.segments_gdf.sindex
+            logger.info(
                 "WacoStreetsAnalyzer initialized. Total streets: %s, Total segments: %s",
                 len(self.streets_gdf), len(self.segments_gdf)
             )
         except Exception as e:
-            logging.error("Error during WacoStreetsAnalyzer initialization: %s", str(e))
+            logger.error("Error during WacoStreetsAnalyzer initialization: %s", str(e))
             raise
 
     async def load_data(self):
@@ -47,7 +48,7 @@ class WacoStreetsAnalyzer:
             else:
                 await self._process_and_cache_data()
         except Exception as e:
-            logging.error("Error in load_data: %s", str(e))
+            logger.error("Error in load_data: %s", str(e))
             raise
 
     async def _load_from_cache(self):
@@ -58,19 +59,16 @@ class WacoStreetsAnalyzer:
             self.segments_gdf = cache_data["segments_gdf"]
             self.traveled_segments = cache_data["traveled_segments"]
             if (
-                self.streets_gdf is None
-                or self.streets_gdf.empty
-                or self.segments_gdf is None
-                or self.segments_gdf.empty
+                self.streets_gdf is None or self.streets_gdf.empty or
+                self.segments_gdf is None or self.segments_gdf.empty
             ):
                 raise ValueError("Invalid data loaded from cache")
-            logging.info(
+            logger.info(
                 "Loaded data from cache. Total streets: %s, Total segments: %s",
-                len(self.streets_gdf),
-                len(self.segments_gdf)
+                len(self.streets_gdf), len(self.segments_gdf)
             )
         except Exception as e:
-            logging.error("Error loading from cache: %s", str(e))
+            logger.error("Error loading from cache: %s", str(e))
             await self._process_and_cache_data()
 
     async def _process_and_cache_data(self):
@@ -90,13 +88,12 @@ class WacoStreetsAnalyzer:
             ).sort_index()
             self.segments_gdf = self._create_segments()
             await self._save_to_cache()
-            logging.info(
+            logger.info(
                 "Processed and cached street data. Total streets: %d, Total segments: %d",
-                len(self.streets_gdf),
-                len(self.segments_gdf)
+                len(self.streets_gdf), len(self.segments_gdf)
             )
         except Exception as e:
-            logging.error("Error processing street data: %s", str(e))
+            logger.error("Error processing street data: %s", str(e))
             raise
 
     def _create_segments(self):
@@ -127,50 +124,51 @@ class WacoStreetsAnalyzer:
             async with aiofiles.open(self.cache_file, "wb") as f:
                 await f.write(cache_data)
         except Exception as e:
-            logging.error("Error saving to cache: %s", str(e))
+            logger.error("Error saving to cache: %s", str(e))
 
     async def update_progress(self, routes):
         if self.segments_gdf is None:
-            logging.error("segments_gdf is None. Unable to update progress.")
+            logger.error("segments_gdf is None. Unable to update progress.")
             return
-        logging.info("Updating progress with %s new routes...", len(routes))
+        logger.info("Updating progress with %s new routes...", len(routes))
         if not routes:
-            logging.warning("No routes provided for update_progress")
+            logger.warning("No routes provided for update_progress")
             return
         valid_features = [
-            feature
-            for feature in routes
-            if feature["geometry"]["type"] == "LineString"
-            and len(feature["geometry"]["coordinates"]) > 1
+            feature for feature in routes
+            if feature["geometry"]["type"] == "LineString" and len(feature["geometry"]["coordinates"]) > 1
         ]
         if not valid_features:
-            logging.warning("No valid features to process")
+            logger.warning("No valid features to process")
             return
         try:
-            gdf = await asyncio.to_thread(
-                gpd.GeoDataFrame.from_features, valid_features
-            )
-            gdf.set_crs(epsg=4326, inplace=True)
-            for _, route in gdf.iterrows():
-                if isinstance(route.geometry, LineString):
-                    line = route.geometry
-                    logging.info("Processing route: %s...", line.wkt[:100])
-                    possible_matches_index = list(self.sindex.intersection(line.bounds))
-                    possible_matches = self.segments_gdf.iloc[possible_matches_index]
-                    for _, segment in possible_matches.iterrows():
-                        if line.distance(segment.geometry) <= self.snap_distance:
-                            self.traveled_segments.add(segment.segment_id)
-                    if len(self.traveled_segments) == 0:
-                        logging.warning("Route did not intersect with any segments")
-                    else:
-                        logging.info(
-                            "Route intersected with %d segments", len(self.traveled_segments)
-                        )
-            await self._save_to_cache()
-            logging.info("Total traveled segments: %s", len(self.traveled_segments))
-            logging.info("Progress update completed.")
+            batch_size = 10000
+            for i in range(0, len(valid_features), batch_size):
+                batch = valid_features[i:i+batch_size]
+                gdf = await asyncio.to_thread(
+                    gpd.GeoDataFrame.from_features, batch
+                )
+                gdf.set_crs(epsg=4326, inplace=True)
+                for _, route in gdf.iterrows():
+                    if isinstance(route.geometry, LineString):
+                        line = route.geometry
+                        logger.info("Processing route: %s...", line.wkt[:100])
+                        possible_matches_index = list(self.sindex.intersection(line.bounds))
+                        possible_matches = self.segments_gdf.iloc[possible_matches_index]
+                        for _, segment in possible_matches.iterrows():
+                            if line.distance(segment.geometry) <= self.snap_distance:
+                                self.traveled_segments.add(segment.segment_id)
+                        if len(self.traveled_segments) == 0:
+                            logger.warning("Route did not intersect with any segments")
+                        else:
+                            logger.info(
+                                "Route intersected with %d segments", len(self.traveled_segments)
+                            )            
+                            await self._save_to_cache()
+            logger.info("Total traveled segments: %s", len(self.traveled_segments))
+            logger.info("Progress update completed.")
         except Exception as e:
-            logging.error("Error processing routes: %s", str(e), exc_info=True)
+            logger.error("Error processing routes: %s", str(e), exc_info=True)
 
     def calculate_progress(self):
         logger.info("Calculating progress...")

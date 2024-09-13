@@ -140,7 +140,7 @@ function updateLiveRouteOnMap(liveData) {
 
       if (!liveRoutePolyline) {
         liveRoutePolyline = L.polyline(latLngs, {
-          color: 'red',
+          color: '#ADD8E6',
           weight: 3,
           opacity: 0.7,
           pane: 'liveRoutePane' // Add the live route to the correct pane

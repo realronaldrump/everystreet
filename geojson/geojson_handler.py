@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
+from shapely.geometry import shape, Point
+import shapely.geometry
 
 from .data_loader import DataLoader
 from .data_processor import DataProcessor
@@ -21,8 +23,9 @@ class GeoJSONHandler:
         self.monthly_data = defaultdict(list)
 
     async def load_historical_data(self):
-        await self.data_loader.load_data(self)
-        await self.update_all_progress()
+        if not self.historical_geojson_features:
+            await self.data_loader.load_data(self)
+            await self.update_all_progress()
 
     async def update_historical_data(self, fetch_all=False, start_date=None, end_date=None):
         await self.data_processor.update_and_process_data(self, fetch_all, start_date, end_date)
@@ -66,7 +69,6 @@ class GeoJSONHandler:
         return self.historical_geojson_features
 
     async def load_waco_boundary(self, boundary_type):
-        """Loads the GeoJSON data for the specified Waco boundary type."""
         try:
             if boundary_type == "city_limits":
                 file_path = "static/boundaries/city_limits.geojson"
@@ -78,7 +80,8 @@ class GeoJSONHandler:
                 logger.warning(f"Unknown Waco boundary type: {boundary_type}")
                 return None
 
-            return await asyncio.to_thread(self._read_json_file, file_path)
+            geojson_data = await asyncio.to_thread(self._read_json_file, file_path)
+            return shapely.geometry.shape(geojson_data['features'][0]['geometry'])
         except Exception as e:
             logger.error(f"Error loading Waco boundary: {e}")
             return None

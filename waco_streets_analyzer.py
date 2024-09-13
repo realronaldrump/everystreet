@@ -6,6 +6,7 @@ import aiofiles
 import geopandas as gpd
 from rtree import index
 from shapely.geometry import LineString
+import shapely.vectorized
 
 gpd.options.use_pygeos = True
 
@@ -22,7 +23,7 @@ class WacoStreetsAnalyzer:
         self.streets_gdf = None
         self.segments_gdf = None
         self.traveled_segments = set()
-        self.snap_distance = 0.00001
+        self.snap_distance = 0.0000001
         self.sindex = None
         self.lock = asyncio.Lock()
 
@@ -149,27 +150,21 @@ class WacoStreetsAnalyzer:
                     gpd.GeoDataFrame.from_features, batch
                 )
                 gdf.set_crs(epsg=4326, inplace=True)
-                for _, route in gdf.iterrows():
-                    if isinstance(route.geometry, LineString):
-                        line = route.geometry
-                        logger.info("Processing route: %s...", line.wkt[:100])
-                        possible_matches_index = list(self.sindex.intersection(line.bounds))
-                        possible_matches = self.segments_gdf.iloc[possible_matches_index]
-                        for _, segment in possible_matches.iterrows():
-                            if line.distance(segment.geometry) <= self.snap_distance:
-                                self.traveled_segments.add(segment.segment_id)
-                        if len(self.traveled_segments) == 0:
-                            logger.warning("Route did not intersect with any segments")
-                        else:
-                            logger.info(
-                                "Route intersected with %d segments", len(self.traveled_segments)
-                            )            
-                            await self._save_to_cache()
-            logger.info("Total traveled segments: %s", len(self.traveled_segments))
+
+                # Perform spatial join instead of iterating
+                joined = gpd.sjoin(gdf, self.segments_gdf, how="inner", predicate="intersects")
+                
+                # Filter based on distance
+                close_segments = joined[joined.apply(lambda row: row.geometry.distance(self.segments_gdf.loc[row.index_right, 'geometry']) <= self.snap_distance, axis=1)]
+                
+                # Update traveled_segments
+                self.traveled_segments.update(close_segments['segment_id'].tolist())
+
+                logger.info("Batch processed. Total traveled segments: %s", len(self.traveled_segments))
+
             logger.info("Progress update completed.")
         except Exception as e:
             logger.error("Error processing routes: %s", str(e), exc_info=True)
-
     def calculate_progress(self):
         logger.info("Calculating progress...")
         if self.segments_gdf is None:

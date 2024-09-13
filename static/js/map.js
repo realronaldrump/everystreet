@@ -44,6 +44,8 @@ let liveDataFetchController = null;
 let isCenteringOnLiveMarker = false;
 let centeringInterval;
 const processingQueue = [];
+let wacoOnlyMode = true; // only allow panning in/around waco
+
 
 async function clearAllBrowserStorage() {
   console.log('Clearing all browser storage...');
@@ -176,7 +178,7 @@ function updateLiveRouteOnMap(liveData) {
           color: '#ADD8E6',
           weight: 3,
           opacity: 0.7,
-          pane: 'liveRoutePane' // Add the live route to the correct pane
+          pane: 'liveRoutePane'
         }).addTo(map);
       } else {
         liveRoutePolyline.setLatLngs(latLngs);
@@ -188,8 +190,13 @@ function updateLiveRouteOnMap(liveData) {
       } else {
         liveMarker = L.marker(lastCoord, { 
           icon: RED_BLINKING_MARKER_ICON,
-          pane: 'liveRoutePane' // Add the live marker to the correct pane
+          pane: 'liveRoutePane'
         }).addTo(map);
+      }
+
+      // Only update the map view if centering is enabled
+      if (isCenteringOnLiveMarker) {
+        updateMapCenter();
       }
     }
   }
@@ -295,9 +302,12 @@ function initMap() {
         map.remove();
       }
       map = L.map('map', {
-        maxBounds: MCLENNAN_COUNTY_BOUNDS.pad(0.1),
-        minZoom: 10
+        maxBounds: wacoOnlyMode ? MCLENNAN_COUNTY_BOUNDS.pad(0.1) : null,
+        minZoom: wacoOnlyMode ? 10 : null
       });
+
+      // Set a default view
+      map.setView([31.5497, -97.1467], 10); // Coordinates for Waco, TX with a zoom level of 10
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19
@@ -311,7 +321,7 @@ function initMap() {
       map.createPane('liveRoutePane').style.zIndex = 450;
 
       // Set a flag to indicate that the map is ready to be centered
-      map.initialized = false;
+      map.initialized = true;
 
       // Initialize drawing tools
       drawnItems = new L.FeatureGroup();
@@ -353,14 +363,24 @@ function initMap() {
       };
       progressControl.addTo(map);
 
-      showFeedback('Map initialized successfully', 'success');
-      resolve(map);
+      if (wacoOnlyMode) {
+        map.on('drag', function() {
+          map.panInsideBounds(MCLENNAN_COUNTY_BOUNDS, { animate: false });
+        });
+      }
+
+      // Ensure the map is properly loaded before resolving the promise
+      map.whenReady(() => {
+        showFeedback('Map initialized successfully', 'success');
+        resolve(map);
+      });
     } catch (error) {
+      console.error('Error initializing map:', error);
+      showFeedback('Error initializing map. Please try again.', 'error');
       reject(error);
     }
   });
 }
-
 // Call this function after all layers are initialized
 function finalizeMapInitialization() {
   if (map) {
@@ -633,26 +653,59 @@ async function loadLiveRouteData() {
 function toggleCenterOnLiveMarker() {
   isCenteringOnLiveMarker = !isCenteringOnLiveMarker;
   
+  const centerLiveMarkerBtn = document.getElementById('centerLiveMarkerBtn');
+  
   if (isCenteringOnLiveMarker) {
     // Start centering
     centeringInterval = setInterval(updateMapCenter, 1000); // Update every second
     showFeedback('Started centering on live marker', 'info');
-    document.getElementById('centerLiveMarkerBtn').textContent = 'Stop Centering';
+    centerLiveMarkerBtn.textContent = 'Stop Centering';
     updateMapCenter(); // Center immediately
   } else {
     // Stop centering
     clearInterval(centeringInterval);
     showFeedback('Stopped centering on live marker', 'info');
-    document.getElementById('centerLiveMarkerBtn').textContent = 'Center on Live Marker';
+    centerLiveMarkerBtn.textContent = 'Center on Live Marker';
   }
 }
 
+function toggleWacoOnlyMode() {
+  wacoOnlyMode = !wacoOnlyMode;
+  initMap().then(() => {
+    if (wacoOnlyMode) {
+      map.setMaxBounds(MCLENNAN_COUNTY_BOUNDS.pad(0.1));
+      map.setMinZoom(10);
+      map.fitBounds(MCLENNAN_COUNTY_BOUNDS);
+    } else {
+      map.setMaxBounds(null);
+      map.setMinZoom(null);
+      // Set a default view for non-Waco-only mode
+      map.setView([31.5497, -97.1467], 10); // Coordinates for Waco, TX with a zoom level of 10
+    }
+    
+    // Ensure the map is properly loaded before proceeding
+    map.whenReady(() => {
+      // Reinitialize layers
+      Promise.all([
+        initWacoLimitsLayer(),
+        loadProgressData(),
+        loadWacoStreets(),
+        displayHistoricalData(true)
+      ]).then(() => {
+        showFeedback(`Waco-only mode ${wacoOnlyMode ? 'enabled' : 'disabled'}`, 'info');
+      }).catch(error => {
+        console.error('Error reinitializing layers:', error);
+        showFeedback('Error updating map layers. Please try again.', 'error');
+      });
+    });
+  }).catch(error => {
+    console.error('Error initializing map:', error);
+    showFeedback('Error initializing map. Please try again.', 'error');
+  });
+}
 function updateMapCenter() {
   if (isCenteringOnLiveMarker && liveMarker && map) {
     map.panTo(liveMarker.getLatLng(), { animate: true });
-  } else if (isCenteringOnLiveMarker && (!liveMarker || !map)) {
-    showFeedback('Live marker not available', 'warning');
-    toggleCenterOnLiveMarker(); // Turn off centering if live marker is not available
   }
 }
 
@@ -1294,6 +1347,11 @@ function setupEventListeners() {
   if (centerLiveMarkerBtn) {
     centerLiveMarkerBtn.addEventListener('click', toggleCenterOnLiveMarker);
   }
+  const toggleWacoOnlyModeBtn = document.getElementById('toggleWacoOnlyModeBtn');
+if (toggleWacoOnlyModeBtn) {
+  toggleWacoOnlyModeBtn.addEventListener('click', toggleWacoOnlyMode);
+}
+
 
 
   // Layer Control Checkboxes

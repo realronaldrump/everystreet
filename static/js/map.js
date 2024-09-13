@@ -41,6 +41,8 @@ let playbackAnimation = null;
 let isProcessing = false;
 let searchMarker = null;
 let liveDataFetchController = null;
+let isCenteringOnLiveMarker = false;
+let centeringInterval;
 const processingQueue = [];
 
 async function clearAllBrowserStorage() {
@@ -106,28 +108,44 @@ window.addEventListener('beforeunload', clearAllBrowserStorage);
 // Call clearAllBrowserStorage when the page loads to ensure a fresh start
 window.addEventListener('load', clearAllBrowserStorage);
 
+window.addEventListener('beforeunload', () => {
+  if (centeringInterval) {
+    clearInterval(centeringInterval);
+  }
+});
+
 function setupWebSocketConnections() {
-  liveDataSocket = new WebSocket(`${wsBaseUrl}/ws/live_route`);
-  liveDataSocket.onmessage = (event) => {
-    const liveData = JSON.parse(event.data);
-    updateLiveRouteOnMap(liveData);
+  const connectWebSocket = (url, handlers) => {
+    const socket = new WebSocket(url);
+    socket.onmessage = handlers.onmessage;
+    socket.onerror = handlers.onerror;
+    socket.onclose = () => {
+      console.log('WebSocket connection closed. Reconnecting...');
+      setTimeout(() => connectWebSocket(url, handlers), 5000);
+    };
+    return socket;
   };
 
-  metricsSocket = new WebSocket(`${wsBaseUrl}/ws/trip_metrics`);
-  metricsSocket.onmessage = (event) => {
-    const metrics = JSON.parse(event.data);
-    updateMetrics(metrics);
-  };
-
-  // Error handling for WebSockets
-  [liveDataSocket, metricsSocket].forEach(socket => {
-    socket.onerror = (error) => {
+  liveDataSocket = connectWebSocket(`${wsBaseUrl}/ws/live_route`, {
+    onmessage: (event) => {
+      const liveData = JSON.parse(event.data);
+      updateLiveRouteOnMap(liveData);
+    },
+    onerror: (error) => {
       console.error('WebSocket error:', error);
       showFeedback('Error in WebSocket connection', 'error');
-    };
-    socket.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
+    }
+  });
+
+  metricsSocket = connectWebSocket(`${wsBaseUrl}/ws/trip_metrics`, {
+    onmessage: (event) => {
+      const metrics = JSON.parse(event.data);
+      updateMetrics(metrics);
+    },
+    onerror: (error) => {
+      console.error('WebSocket error:', error);
+      showFeedback('Error in WebSocket connection', 'error');
+    }
   });
 }
 
@@ -163,15 +181,24 @@ function updateLiveRouteOnMap(liveData) {
 }
 
 function updateMetrics(metrics) {
-  if (metrics) {
-    document.getElementById('totalDistance').textContent = `${metrics.total_distance.toFixed(2)} miles`;
-    document.getElementById('totalTime').textContent = metrics.total_time;
-    document.getElementById('maxSpeed').textContent = `${metrics.max_speed.toFixed(2)} mph`;
-    document.getElementById('startTime').textContent = new Date(metrics.start_time).toLocaleString();
-    document.getElementById('endTime').textContent = new Date(metrics.end_time).toLocaleString();
-    
-    animateStatUpdates(metrics);
+  if (!metrics) {
+    console.warn('No metrics data received');
+    return;
   }
+
+  const updateElement = (id, value, unit = '') => {
+    const element = document.getElementById(id);
+    if (element && value !== undefined) {
+      element.textContent = `${value}${unit}`;
+      animateElement(element, 'animate__flipInX');
+    }
+  };
+
+  updateElement('totalDistance', metrics.total_distance?.toFixed(2), ' miles');
+  updateElement('totalTime', metrics.total_time);
+  updateElement('maxSpeed', metrics.max_speed?.toFixed(2), ' mph');
+  updateElement('startTime', new Date(metrics.start_time).toLocaleString());
+  updateElement('endTime', new Date(metrics.end_time).toLocaleString());
 }
 
 setupWebSocketConnections();
@@ -198,40 +225,49 @@ const RED_MARKER_ICON = L.divIcon({
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    showFeedback('Initializing application...', 'info');
+      showFeedback('Initializing application...', 'info');
 
-    // Initialize the map
-    map = await initMap();
+      // Initialize the map
+      map = await initMap();
 
-    // Initialize layers and controls
-    await Promise.all([
-      initWacoLimitsLayer(),
-      initProgressLayer(),
-      initWacoStreetsLayer(),
-      loadHistoricalData().catch(error => {
-        console.error('Historical data loading failed:', error);
-        showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
-      }),
-    ]);
+      // Set initial state for checkboxes
+      document.getElementById('filterWaco').checked = true;
+      document.getElementById('wacoLimitsCheckbox').checked = true;
 
-    // Set up data polling and updates
-    setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
-    setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
+      // Initialize layers and controls
+      await Promise.all([
+          initWacoLimitsLayer(),
+          initProgressLayer(),
+          initWacoStreetsLayer(),
+          loadHistoricalData().catch(error => {
+              console.error('Historical data loading failed:', error);
+              showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
+          }),
+      ]);
 
-    // Set up event listeners
-    setupEventListeners();
+      // Ensure Waco limits layer is visible
+      updateWacoLimitsLayerVisibility();
 
-    // Set up WebSocket connections after map initialization
-    setupWebSocketConnections();
+      // Set up data polling and updates
+      setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL);
+      setInterval(loadProgressData, PROGRESS_DATA_UPDATE_INTERVAL);
 
-    showFeedback('Application initialized successfully', 'success');
+      // Set up event listeners
+      setupEventListeners();
+
+      // Set up WebSocket connections after map initialization
+      setupWebSocketConnections();
+
+      // Initial display of historical data with Waco filter applied
+      displayHistoricalData(true);
+
+      showFeedback('Application initialized successfully', 'success');
   } catch (error) {
-    handleError(error, 'initializing application');
+      handleError(error, 'initializing application');
   } finally {
-    hideLoading(); // Ensure loading screen is hidden regardless of success or failure
+      hideLoading();
   }
 });
-
 
 // Initialize the Leaflet map
 function initMap() {
@@ -240,7 +276,10 @@ function initMap() {
       if (map) {
         map.remove();
       }
-      map = L.map('map').fitBounds(MCLENNAN_COUNTY_BOUNDS);
+      map = L.map('map', {
+        maxBounds: MCLENNAN_COUNTY_BOUNDS.pad(0.1)
+      });
+      map.fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19
@@ -251,7 +290,7 @@ function initMap() {
       map.createPane('progressPane').style.zIndex = 410;
       map.createPane('historicalDataPane').style.zIndex = 430;
       map.createPane('wacoStreetsPane').style.zIndex = 440;
-      map.createPane('liveRoutePane').style.zIndex = 450; // Add pane for live route
+      map.createPane('liveRoutePane').style.zIndex = 450;
 
       // Add progress controls
       const progressControl = L.control({ position: 'bottomleft' });
@@ -539,6 +578,32 @@ async function loadLiveRouteData() {
   }
 }
 
+function toggleCenterOnLiveMarker() {
+  isCenteringOnLiveMarker = !isCenteringOnLiveMarker;
+  
+  if (isCenteringOnLiveMarker) {
+    // Start centering
+    centeringInterval = setInterval(updateMapCenter, 1000); // Update every second
+    showFeedback('Started centering on live marker', 'info');
+    document.getElementById('centerLiveMarkerBtn').textContent = 'Stop Centering';
+    updateMapCenter(); // Center immediately
+  } else {
+    // Stop centering
+    clearInterval(centeringInterval);
+    showFeedback('Stopped centering on live marker', 'info');
+    document.getElementById('centerLiveMarkerBtn').textContent = 'Center on Live Marker';
+  }
+}
+
+function updateMapCenter() {
+  if (isCenteringOnLiveMarker && liveMarker && map) {
+    map.panTo(liveMarker.getLatLng(), { animate: true });
+  } else if (isCenteringOnLiveMarker && (!liveMarker || !map)) {
+    showFeedback('Live marker not available', 'warning');
+    toggleCenterOnLiveMarker(); // Turn off centering if live marker is not available
+  }
+}
+
 // Clear the live route from the map
 function clearLiveRoute() {
   if (liveRoutePolyline) {
@@ -578,34 +643,6 @@ function updateLiveData(liveData) {
   }
 }
 
-function updateMetrics(metrics) {
-  if (metrics && Object.keys(metrics).length > 0) {
-    Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
-      if (deviceMetrics) {
-        if (deviceMetrics.total_distance !== undefined) {
-          document.getElementById('totalDistance').textContent = `${deviceMetrics.total_distance.toFixed(2)} miles`;
-        }
-        if (deviceMetrics.total_time !== undefined) {
-          document.getElementById('totalTime').textContent = deviceMetrics.total_time;
-        }
-        if (deviceMetrics.max_speed !== undefined) {
-          document.getElementById('maxSpeed').textContent = `${deviceMetrics.max_speed.toFixed(2)} mph`;
-        }
-        if (deviceMetrics.start_time) {
-          document.getElementById('startTime').textContent = new Date(deviceMetrics.start_time).toLocaleString();
-        }
-        if (deviceMetrics.end_time) {
-          document.getElementById('endTime').textContent = new Date(deviceMetrics.end_time).toLocaleString();
-        }
-      }
-    });
-  } else {
-    console.warn('No metrics data received');
-  }
-
-  // Animate the updates
-  animateStatUpdates(metrics);
-}
 
 // Update the animateStatUpdates function as well
 function animateStatUpdates(metrics) {
@@ -979,7 +1016,7 @@ async function exportToGPX() {
 }
 
 // Update the map with historical data
-function updateMapWithHistoricalData(data) {
+function updateMapWithHistoricalData(data, fitBounds = false) {
   removeLayer(historicalDataLayer);
 
   if (!data || !data.features || data.features.length === 0) {
@@ -1023,7 +1060,8 @@ function updateMapWithHistoricalData(data) {
       }).addTo(map);
     }
 
-    if (data.features.length > 0) {
+    // Only fit bounds if explicitly requested
+    if (fitBounds && data.features.length > 0) {
       const bounds = L.latLngBounds(data.features.flatMap(f => f.geometry.coordinates.map(coord => L.latLng(coord[1], coord[0]))));
       if (bounds.isValid()) {
         map.fitBounds(bounds);
@@ -1081,10 +1119,10 @@ function createPopupContent(feature) {
   return popupContent;
 }
 // Display historical data based on filter settings
-async function displayHistoricalData() {
+async function displayHistoricalData(fitBounds = false) {
   if (isProcessing) {
-    showFeedback('A task is already in progress. Please wait.', 'warning');
-    return;
+      showFeedback('A task is already in progress. Please wait.', 'warning');
+      return;
   }
 
   isProcessing = true;
@@ -1092,30 +1130,33 @@ async function displayHistoricalData() {
   showLoading('Loading historical data...');
 
   try {
-    const data = await fetchHistoricalData();
-    if (data && data.features) {
-      updateMapWithHistoricalData(data);
-    } else {
-      showFeedback('No historical data available for the selected period.', 'info');
-    }
+      const filterWaco = document.getElementById('filterWaco').checked;
+      const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+      const data = await fetchHistoricalData(null, null, filterWaco, wacoBoundary);
+      
+      if (data && data.features) {
+          updateMapWithHistoricalData(data, fitBounds);
+      } else {
+          showFeedback('No historical data available for the selected period.', 'info');
+      }
 
-    // Reload progress layer with the new boundary
-    const progressLayer = await loadProgressData();
-    if (progressLayer) {
-      showFeedback('Progress data loaded successfully', 'success');
-    }
+      // Reload progress layer with the new boundary
+      const progressLayer = await loadProgressData();
+      if (progressLayer) {
+          showFeedback('Progress data loaded successfully', 'success');
+      }
 
-    // Reload Waco streets layer with the new boundary and filter
-    await loadWacoStreets();
+      // Reload Waco streets layer with the new boundary and filter
+      await loadWacoStreets();
 
   } catch (error) {
-    console.error('Error displaying historical data:', error);
-    showFeedback(`Error loading historical data: ${error.message}. Please try again.`, 'error');
+      console.error('Error displaying historical data:', error);
+      showFeedback(`Error loading historical data: ${error.message}. Please try again.`, 'error');
   } finally {
-    isProcessing = false;
-    enableFilterControls();
-    hideLoading();
-    checkQueuedTasks();
+      isProcessing = false;
+      enableFilterControls();
+      hideLoading();
+      checkQueuedTasks();
   }
 }
 
@@ -1154,12 +1195,11 @@ function setupEventListeners() {
   const wacoBoundarySelectEl = document.getElementById('wacoBoundarySelect');
   const filterWacoEl = document.getElementById('filterWaco');
   const applyFilterBtnEl = document.getElementById('applyFilterBtn');
-  
 
-  if (startDateEl) startDateEl.addEventListener('change', displayHistoricalData);
-  if (endDateEl) endDateEl.addEventListener('change', displayHistoricalData);
-  if (filterWacoEl) filterWacoEl.addEventListener('change', displayHistoricalData);
-  if (applyFilterBtnEl) applyFilterBtnEl.addEventListener('click', displayHistoricalData);
+  if (startDateEl) startDateEl.addEventListener('change', () => displayHistoricalData(false));
+  if (endDateEl) endDateEl.addEventListener('change', () => displayHistoricalData(false));
+  if (filterWacoEl) filterWacoEl.addEventListener('change', () => displayHistoricalData(false));
+  if (applyFilterBtnEl) applyFilterBtnEl.addEventListener('click', () => displayHistoricalData(false));
 
   // Waco Boundary Select Event Listener
   if (wacoBoundarySelectEl) {
@@ -1167,15 +1207,24 @@ function setupEventListeners() {
       await initWacoLimitsLayer();
       await loadProgressData();
       await loadWacoStreets();
+      displayHistoricalData(true); // Fit bounds when changing boundary
     });
   }
 
   const timeFiltersEl = document.getElementById('time-filters');
   if (timeFiltersEl) {
     timeFiltersEl.querySelectorAll('button').forEach(button => {
-      button.addEventListener('click', () => filterRoutesBy(button.dataset.filter));
+      button.addEventListener('click', () => {
+        filterRoutesBy(button.dataset.filter);
+        displayHistoricalData(true); // Fit bounds when changing time filter
+      });
     });
   }
+  const centerLiveMarkerBtn = document.getElementById('centerLiveMarkerBtn');
+  if (centerLiveMarkerBtn) {
+    centerLiveMarkerBtn.addEventListener('click', toggleCenterOnLiveMarker);
+  }
+
 
   // Layer Control Checkboxes
   const historicalDataCheckboxEl = document.getElementById('historicalDataCheckbox');
@@ -1208,7 +1257,7 @@ function setupEventListeners() {
         if (response.ok) {
           showFeedback(data.message, 'success');
           await Promise.all([
-            displayHistoricalData(),
+            displayHistoricalData(true), // Fit bounds after updating data
             updateProgress()
           ]);
         } else {
@@ -1339,7 +1388,10 @@ function setupEventListeners() {
   // Clear Drawn Shapes Button
   const clearDrawnShapesBtn = document.getElementById('clearDrawnShapesBtn');
   if (clearDrawnShapesBtn) {
-    clearDrawnShapesBtn.addEventListener('click', handleBackgroundTask(clearDrawnShapes, 'Clearing drawn shapes...'));
+    clearDrawnShapesBtn.addEventListener('click', handleBackgroundTask(() => {
+      clearDrawnShapes();
+      displayHistoricalData(true); // Fit bounds after clearing shapes
+    }, 'Clearing drawn shapes...'));
   }
 
   // Reset Progress Button
@@ -1356,6 +1408,7 @@ function setupEventListeners() {
             loadWacoStreets(),
             loadProgressData()
           ]);
+          displayHistoricalData(true); // Fit bounds after resetting progress
         } else {
           throw new Error(data.error);
         }
@@ -1372,7 +1425,6 @@ function setupEventListeners() {
       loadWacoStreets();
     });
   }
-  
 
   // Logout Button
   const logoutBtn = document.getElementById('logoutBtn');

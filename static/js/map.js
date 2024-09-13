@@ -314,7 +314,7 @@ function initMap() {
       }).addTo(map);
 
       // Create map panes with correct z-index order
-      map.createPane('wacoLimitsPane').style.zIndex = 400;
+      map.createPane('wacoLimitsPane').style.zIndex = 300;
       map.createPane('progressPane').style.zIndex = 410;
       map.createPane('historicalDataPane').style.zIndex = 430;
       map.createPane('wacoStreetsPane').style.zIndex = 440;
@@ -410,7 +410,8 @@ async function initWacoLimitsLayer() {
         fillColor: 'orange',
         fillOpacity: 0.03
       },
-      pane: 'wacoLimitsPane'
+      pane: 'wacoLimitsPane',
+      interactive: false  // Make the layer non-interactive
     });
     updateWacoLimitsLayerVisibility();
   } catch (error) {

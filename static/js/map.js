@@ -863,46 +863,50 @@ async function loadWacoStreets() {
     await waitForMap();
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
     
-    const newWacoStreetsLayer = L.vectorGrid.slicer(data, {
-      rendererFactory: L.canvas.tile,
-      vectorTileLayerStyles: {
-        sliced: {
-          color: '#808080',
-          weight: 1,
-          opacity: 0.7
-        }
-      },
-      interactive: true,
-      getFeatureId: function(f) {
-        return f.properties.name;
-      }
-    });
-
     if (wacoStreetsLayer && map.hasLayer(wacoStreetsLayer)) {
       map.removeLayer(wacoStreetsLayer);
     }
 
-    wacoStreetsLayer = newWacoStreetsLayer;
-    updateWacoStreetsLayerVisibility();
+    wacoStreetsLayer = L.geoJSON(data, {
+      style: {
+        color: '#808080',
+        weight: 1,
+        opacity: 0.7
+      },
+      pane: 'wacoStreetsPane',
+      onEachFeature: (feature, layer) => {
+        if (feature.properties && feature.properties.name) {
+          layer.bindPopup(feature.properties.name);
+        }
 
-    wacoStreetsLayer.on('mouseover', (e) => {
-      const properties = e.layer.properties;
-      if (properties && properties.name) {
-        L.popup()
-          .setContent(properties.name)
-          .setLatLng(e.latlng)
-          .openOn(map);
+        layer.on('mouseover', function() {
+          this.setStyle({
+            color: '#FFFF00',
+            weight: 5
+          });
+        });
+
+        layer.on('mouseout', function() {
+          this.setStyle({
+            color: '#808080',
+            weight: 1
+          });
+        });
+
+        layer.on('click', function() {
+          this.openPopup();
+        });
       }
     });
 
+    updateWacoStreetsLayerVisibility();
     showFeedback('Waco streets displayed', 'success');
-    return wacoStreetsLayer;
   } catch (error) {
-    console.error('Error loading Waco streets:', error);
-    showFeedback('Error loading Waco streets', 'error');
-    throw error;
+    console.error('Error initializing Waco streets layer:', error);
+    showFeedback('Error loading Waco streets. Some features may be unavailable.', 'error');
   }
 }
+
 // Add a popup to a route feature
 function addRoutePopup(feature, layer) {
   const timestamp = feature.properties.timestamp;

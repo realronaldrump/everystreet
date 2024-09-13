@@ -798,24 +798,28 @@ async function updateProgress() {
         }, 1000);
       }
       
-      // Create and append sanitized elements instead of using innerHTML
-      progressText.textContent = ''; // Clear existing content
+      // Update the progress text
+      progressText.textContent = `${data.coverage_percentage.toFixed(2)}% Complete`;
       
-      const lengthCoverage = document.createElement('p');
-      lengthCoverage.innerHTML = '<strong>Length Coverage:</strong> ';
-      lengthCoverage.appendChild(document.createTextNode(`${data.coverage_percentage.toFixed(2)}% of Waco Streets Traveled`));
-      
-      const streetCount = document.createElement('p');
-      streetCount.innerHTML = '<strong>Segment Count:</strong> ';
-      streetCount.appendChild(document.createTextNode(`${data.traveled_streets} / ${data.total_streets} (${(data.traveled_streets / data.total_streets * 100).toFixed(2)}%)`));
-      
-      progressText.appendChild(lengthCoverage);
-      progressText.appendChild(streetCount);
+      // Update the stat cards
+      updateStatCard('lengthCoverage', `${data.coverage_percentage.toFixed(2)}% of Waco Streets Traveled`);
+      updateStatCard('streetCount', `${data.total_streets}`);
+      updateStatCard('streetsDriven', data.traveled_streets);
+      updateStatCard('streetsRemaining', data.total_streets - data.traveled_streets);
+      updateStatCard('percentageDriven', `${(data.traveled_streets / data.total_streets * 100).toFixed(2)}%`);
     } else {
       console.warn("Progress data is incomplete or DOM elements not found");
     }
   } catch (error) {
     console.error('Error fetching progress:', error);
+  }
+}
+
+function updateStatCard(id, value) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = value;
+    animateElement(element, 'animate__flipInX');
   }
 }
 // Load progress data and update the progress layer

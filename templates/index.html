@@ -6,6 +6,7 @@
     <title>Every Street - Tracking Davis's Waco Adventure</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -33,7 +34,7 @@
                             <label for="historicalDataCheckbox">Historical Data</label>
                         </div>
                         <div class="map-control-item">
-                            <input type="checkbox" id="wacoStreetsCheckbox" >
+                            <input type="checkbox" id="wacoStreetsCheckbox">
                             <label for="wacoStreetsCheckbox">Waco Streets</label>
                         </div>
                         <div class="map-control-item">
@@ -97,11 +98,11 @@
                     </div>
                     <div class="filter-row">
                         <div class="filter-item">
-                          <label for="dateRangeSlider">Date Range: <span id="dateRangeValue">30 days</span></label>
-                          <input type="range" id="dateRangeSlider" min="1" max="365" value="30">
+                            <label for="dateRangeSlider">Date Range: <span id="dateRangeValue">30 days</span></label>
+                            <input type="range" id="dateRangeSlider" min="1" max="365" value="30">
                         </div>
                         <button id="updateDataBtn">Check for New Driving Data</button>
-                      </div>
+                    </div>
                 </div>
             </section>
 
@@ -176,13 +177,34 @@
                     <h3>Waco Streets Progress</h3>
                     <div class="stat-cards">
                         <div class="stat-card">
-                            <select id="streets-select">
-                                <option value="all">All Streets</option>
-                                <option value="traveled">Traveled Streets</option>
-                                <option value="untraveled">Untraveled Streets</option>
-                            </select>
-                            <button id="resetProgressBtn">Recalculate Street Progress</button>
+                            <h4>Length Coverage</h4>
+                            <p id="lengthCoverage">N/A</p>
                         </div>
+                        <div class="stat-card">
+                            <h4>Unique Streets Driven</h4>
+                            <p id="streetsDriven">N/A</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Streets Remaining</h4>
+                            <p id="streetsRemaining">N/A</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Percentage Driven</h4>
+                            <p id="percentageDriven">N/A</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Total Streets in Waco</h4>
+                            <p id="percentageDriven">N/A</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <select id="streets-select">
+                            <h3>Waco Streets Displayed on Map:</h3>
+                            <option value="all">All Streets</option>
+                            <option value="traveled">Traveled Streets</option>
+                            <option value="untraveled">Untraveled Streets</option>
+                        </select>
+                        <button id="resetProgressBtn">Recalculate Street Progress</button>
                     </div>
                 </div>
             </section>
@@ -202,7 +224,6 @@
                 <button id="forceReloadBtn">Force Reload</button>
                 <button id="toggleWacoOnlyModeBtn">Toggle Waco-Only Mode</button>
             </div>
-            <div>
         </footer>
     </div>
 

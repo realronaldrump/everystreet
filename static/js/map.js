@@ -147,6 +147,21 @@ function setupWebSocketConnections() {
       showFeedback('Error in WebSocket connection', 'error');
     }
   });
+
+  // Fetch initial live route data
+  fetchInitialLiveRouteData();
+}
+
+async function fetchInitialLiveRouteData() {
+  try {
+    const response = await fetch('/api/live_route_data'); // Adjust the endpoint as needed
+    if (!response.ok) throw new Error('Failed to fetch initial live route data');
+    const initialData = await response.json();
+    updateLiveRouteOnMap(initialData);
+  } catch (error) {
+    console.error('Error fetching initial live route data:', error);
+    showFeedback('Error fetching initial live route data', 'error');
+  }
 }
 
 function updateLiveRouteOnMap(liveData) {
@@ -228,7 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showFeedback('Initializing application...', 'info');
 
       // Initialize the map
-      map = await initMap();
+      await initMap();
 
       // Set initial state for checkboxes
       document.getElementById('filterWaco').checked = true;
@@ -244,6 +259,9 @@ document.addEventListener('DOMContentLoaded', async () => {
               showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
           }),
       ]);
+
+      // Finalize map initialization
+      finalizeMapInitialization();
 
       // Ensure Waco limits layer is visible
       updateWacoLimitsLayerVisibility();
@@ -277,9 +295,9 @@ function initMap() {
         map.remove();
       }
       map = L.map('map', {
-        maxBounds: MCLENNAN_COUNTY_BOUNDS.pad(0.1)
+        maxBounds: MCLENNAN_COUNTY_BOUNDS.pad(0.1),
+        minZoom: 10
       });
-      map.fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19
@@ -292,14 +310,8 @@ function initMap() {
       map.createPane('wacoStreetsPane').style.zIndex = 440;
       map.createPane('liveRoutePane').style.zIndex = 450;
 
-      // Add progress controls
-      const progressControl = L.control({ position: 'bottomleft' });
-      progressControl.onAdd = () => {
-        const div = L.DomUtil.create('div', 'progress-control');
-        div.innerHTML = '<div id="progress-bar-container"><div id="progress-bar"></div></div><div id="progress-text"></div>';
-        return div;
-      };
-      progressControl.addTo(map);
+      // Set a flag to indicate that the map is ready to be centered
+      map.initialized = false;
 
       // Initialize drawing tools
       drawnItems = new L.FeatureGroup();
@@ -332,12 +344,30 @@ function initMap() {
 
       map.on(L.Draw.Event.DELETED, displayHistoricalData);
 
+      // Add progress controls
+      const progressControl = L.control({ position: 'bottomleft' });
+      progressControl.onAdd = () => {
+        const div = L.DomUtil.create('div', 'progress-control');
+        div.innerHTML = '<div id="progress-bar-container"><div id="progress-bar"></div></div><div id="progress-text"></div>';
+        return div;
+      };
+      progressControl.addTo(map);
+
       showFeedback('Map initialized successfully', 'success');
       resolve(map);
     } catch (error) {
       reject(error);
     }
   });
+}
+
+// Call this function after all layers are initialized
+function finalizeMapInitialization() {
+  if (map) {
+    map.fitBounds(MCLENNAN_COUNTY_BOUNDS);
+    map.setMinZoom(map.getZoom());  // Set the minimum zoom to the current zoom level
+    map.initialized = true;
+  }
 }
 
 // Initialize the Waco city limits layer
@@ -374,10 +404,21 @@ function updateWacoLimitsLayerVisibility() {
   const showWacoLimits = document.getElementById('wacoLimitsCheckbox').checked;
 
   // Wait for map to be initialized
-  if (map && showWacoLimits && !map.hasLayer(wacoLimitsLayer)) {
-    wacoLimitsLayer.addTo(map);
-  } else if (map && !showWacoLimits && map.hasLayer(wacoLimitsLayer)) {
-    map.removeLayer(wacoLimitsLayer);
+  if (map) {
+    if (showWacoLimits) {
+      if (!wacoLimitsLayer) {
+        // Initialize the layer if it doesn't exist
+        initWacoLimitsLayer().then(() => {
+          if (map && !map.hasLayer(wacoLimitsLayer)) {
+            wacoLimitsLayer.addTo(map);
+          }
+        });
+      } else if (!map.hasLayer(wacoLimitsLayer)) {
+        wacoLimitsLayer.addTo(map);
+      }
+    } else if (map.hasLayer(wacoLimitsLayer)) {
+      map.removeLayer(wacoLimitsLayer);
+    }
   }
 }
 
@@ -408,10 +449,21 @@ function updateProgressLayerVisibility() {
   const showProgressLayer = document.getElementById('progressLayerCheckbox').checked;
 
   // Wait for map to be initialized
-  if (map && showProgressLayer && !map.hasLayer(progressLayer)) {
-    progressLayer.addTo(map);
-  } else if (map && !showProgressLayer && map.hasLayer(progressLayer)) {
-    map.removeLayer(progressLayer);
+  if (map) {
+    if (showProgressLayer) {
+      if (!progressLayer) {
+        // Initialize the layer if it doesn't exist
+        initProgressLayer().then(() => {
+          if (map && !map.hasLayer(progressLayer)) {
+            progressLayer.addTo(map);
+          }
+        });
+      } else if (!map.hasLayer(progressLayer)) {
+        progressLayer.addTo(map);
+      }
+    } else if (map.hasLayer(progressLayer)) {
+      map.removeLayer(progressLayer);
+    }
   }
 }
 
@@ -717,10 +769,9 @@ async function loadProgressData() {
   const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
 
   try {
+    await waitForMap();
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
     
-    await map.whenReady();
-
     const newProgressLayer = L.vectorGrid.slicer(data, {
       rendererFactory: L.canvas.tile,
       vectorTileLayerStyles: {
@@ -740,6 +791,7 @@ async function loadProgressData() {
     progressLayer = newProgressLayer;
     updateProgressLayerVisibility();
 
+    showFeedback('Progress data loaded successfully', 'success');
     return progressLayer;
   } catch (error) {
     console.error('Error loading progress data:', error);
@@ -754,10 +806,9 @@ async function loadWacoStreets() {
   const streetsFilter = document.getElementById('streets-select').value;
 
   try {
+    await waitForMap();
     const data = await fetchGeoJSON(`/waco_streets?wacoBoundary=${wacoBoundary}&filter=${streetsFilter}`);
     
-    await map.whenReady();
-
     const newWacoStreetsLayer = L.vectorGrid.slicer(data, {
       rendererFactory: L.canvas.tile,
       vectorTileLayerStyles: {
@@ -1121,8 +1172,8 @@ function createPopupContent(feature) {
 // Display historical data based on filter settings
 async function displayHistoricalData(fitBounds = false) {
   if (isProcessing) {
-      showFeedback('A task is already in progress. Please wait.', 'warning');
-      return;
+    showFeedback('A task is already in progress. Please wait.', 'warning');
+    return;
   }
 
   isProcessing = true;
@@ -1130,34 +1181,53 @@ async function displayHistoricalData(fitBounds = false) {
   showLoading('Loading historical data...');
 
   try {
-      const filterWaco = document.getElementById('filterWaco').checked;
-      const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
-      const data = await fetchHistoricalData(null, null, filterWaco, wacoBoundary);
-      
-      if (data && data.features) {
-          updateMapWithHistoricalData(data, fitBounds);
-      } else {
-          showFeedback('No historical data available for the selected period.', 'info');
-      }
+    await waitForMap();
+    const filterWaco = document.getElementById('filterWaco').checked;
+    const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
+    const data = await fetchHistoricalData(null, null, filterWaco, wacoBoundary);
+    
+    if (data && data.features) {
+      updateMapWithHistoricalData(data, fitBounds);
+    } else {
+      showFeedback('No historical data available for the selected period.', 'info');
+    }
 
-      // Reload progress layer with the new boundary
-      const progressLayer = await loadProgressData();
-      if (progressLayer) {
-          showFeedback('Progress data loaded successfully', 'success');
-      }
+    // Reload progress layer with the new boundary
+    const progressLayer = await loadProgressData();
+    if (progressLayer) {
+      showFeedback('Progress data loaded successfully', 'success');
+    }
 
-      // Reload Waco streets layer with the new boundary and filter
-      await loadWacoStreets();
+    // Reload Waco streets layer with the new boundary and filter
+    await loadWacoStreets();
+
+    // Ensure the map stays within McLennan County bounds
+    map.fitBounds(MCLENNAN_COUNTY_BOUNDS);
 
   } catch (error) {
-      console.error('Error displaying historical data:', error);
-      showFeedback(`Error loading historical data: ${error.message}. Please try again.`, 'error');
+    console.error('Error displaying historical data:', error);
+    showFeedback(`Error loading historical data: ${error.message}. Please try again.`, 'error');
   } finally {
-      isProcessing = false;
-      enableFilterControls();
-      hideLoading();
-      checkQueuedTasks();
+    isProcessing = false;
+    enableFilterControls();
+    hideLoading();
+    checkQueuedTasks();
   }
+}
+
+function waitForMap() {
+  return new Promise((resolve) => {
+    if (map && map.initialized) {
+      resolve();
+    } else {
+      const checkInterval = setInterval(() => {
+        if (map && map.initialized) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 100);
+    }
+  });
 }
 
 // Disable filter controls

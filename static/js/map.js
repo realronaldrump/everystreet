@@ -682,13 +682,6 @@ async function loadProgressData() {
   try {
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
     
-    // Check if map is defined and initialized
-    if (!map || typeof map.whenReady !== 'function') {
-      console.error('Map is not initialized');
-      showFeedback('Map is not ready. Please try again.', 'error');
-      return null;
-    }
-
     await map.whenReady();
 
     const newProgressLayer = L.vectorGrid.slicer(data, {
@@ -717,6 +710,7 @@ async function loadProgressData() {
     return null;
   }
 }
+
 // Load Waco streets data and update the Waco streets layer
 async function loadWacoStreets() {
   const wacoBoundary = document.getElementById('wacoBoundarySelect').value;

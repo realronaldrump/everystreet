@@ -156,10 +156,36 @@ function setupWebSocketConnections() {
 
 async function fetchInitialLiveRouteData() {
   try {
-    const response = await fetch('/api/live_route_data'); // Adjust the endpoint as needed
-    if (!response.ok) throw new Error('Failed to fetch initial live route data');
+    const response = await fetch('/api/live_route_data');
+    if (!response.ok) {
+      if (response.status === 404) {
+        // No active trip, use last known position
+        const lastPosition = JSON.parse(localStorage.getItem('lastKnownPosition'));
+        if (lastPosition) {
+          updateLiveRouteOnMap({ 
+            features: [{ 
+              geometry: { 
+                type: "LineString",
+                coordinates: [lastPosition] 
+              } 
+            }] 
+          });
+        }
+        return;
+      }
+      throw new Error(`Failed to fetch initial live route data: ${response.status}`);
+    }
     const initialData = await response.json();
-    updateLiveRouteOnMap(initialData);
+    if (initialData && initialData.features && initialData.features.length > 0) {
+      updateLiveRouteOnMap(initialData);
+      // Store the last position
+      const coordinates = initialData.features[0].geometry.coordinates;
+      if (coordinates && coordinates.length > 0) {
+        localStorage.setItem('lastKnownPosition', JSON.stringify(coordinates[coordinates.length - 1]));
+      }
+    } else {
+      console.log('No live route data available');
+    }
   } catch (error) {
     console.error('Error fetching initial live route data:', error);
     showFeedback('Error fetching initial live route data', 'error');

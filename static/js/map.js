@@ -165,7 +165,6 @@ async function fetchInitialLiveRouteData() {
     showFeedback('Error fetching initial live route data', 'error');
   }
 }
-
 function updateLiveRouteOnMap(liveData) {
   if (liveData && liveData.features && liveData.features.length > 0) {
     const coordinates = liveData.features[0].geometry.coordinates;
@@ -181,22 +180,34 @@ function updateLiveRouteOnMap(liveData) {
           pane: 'liveRoutePane'
         }).addTo(map);
       } else {
-        liveRoutePolyline.setLatLngs(latLngs);
-      }
+        const currentLatLngs = liveRoutePolyline.getLatLngs();
+        const newPoints = latLngs.slice(currentLatLngs.length);
 
-      const lastCoord = latLngs[latLngs.length - 1];
-      if (liveMarker) {
-        liveMarker.setLatLng(lastCoord);
-      } else {
-        liveMarker = L.marker(lastCoord, { 
-          icon: RED_BLINKING_MARKER_ICON,
-          pane: 'liveRoutePane'
-        }).addTo(map);
-      }
+        if (newPoints.length > 0) {
+          newPoints.forEach((point, index) => {
+            setTimeout(() => {
+              currentLatLngs.push(point);
+              liveRoutePolyline.setLatLngs(currentLatLngs);
 
-      // Only update the map view if centering is enabled
-      if (isCenteringOnLiveMarker) {
-        updateMapCenter();
+              // Update marker position for the last point
+              if (index === newPoints.length - 1) {
+                if (liveMarker) {
+                  liveMarker.setLatLng(point);
+                } else {
+                  liveMarker = L.marker(point, { 
+                    icon: RED_BLINKING_MARKER_ICON,
+                    pane: 'liveRoutePane'
+                  }).addTo(map);
+                }
+
+                // Only update the map view if centering is enabled
+                if (isCenteringOnLiveMarker) {
+                  updateMapCenter();
+                }
+              }
+            }, index * 50); // Adjust the delay (50ms) to control the animation speed
+          });
+        }
       }
     }
   }

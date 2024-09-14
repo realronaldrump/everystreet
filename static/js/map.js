@@ -212,7 +212,6 @@ function updateMetrics(metrics) {
     const element = document.getElementById(id);
     if (element && value !== undefined) {
       element.textContent = `${value}${unit}`;
-      animateElement(element, 'animate__flipInX');
     }
   };
 
@@ -819,9 +818,9 @@ function updateStatCard(id, value) {
   const element = document.getElementById(id);
   if (element) {
     element.textContent = value;
-    animateElement(element, 'animate__flipInX');
   }
 }
+
 // Load progress data and update the progress layer
 async function loadProgressData() {
   const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
@@ -917,20 +916,29 @@ function addRoutePopup(feature, layer) {
   let formattedDate = 'N/A';
   let formattedTime = 'N/A';
 
+  // Debugging: Log the raw timestamp value
+  console.log('Raw timestamp:', timestamp);
+
   if (timestamp) {
-      try {
-          const date = new Date(timestamp);
-          if (!isNaN(date.getTime())) {
-              formattedDate = date.toLocaleDateString();
-              formattedTime = date.toLocaleTimeString();
-          } else {
-              console.error('Invalid date:', timestamp);
-          }
-      } catch (error) {
-          console.error('Error parsing date:', error);
+    try {
+      // Parse the ISO 8601 timestamp
+      const date = new Date(timestamp);
+
+      // Debugging: Log the parsed date object
+      console.log('Parsed date:', date);
+
+      if (!isNaN(date.getTime())) {
+        // Format the date and time
+        formattedDate = date.toLocaleDateString();
+        formattedTime = date.toLocaleTimeString();
+      } else {
+        console.error('Invalid date:', timestamp);
       }
+    } catch (error) {
+      console.error('Error parsing date:', error);
+    }
   } else {
-      console.warn('No timestamp provided for feature');
+    console.warn('No timestamp provided for feature');
   }
 
   const distance = calculateTotalDistance([feature]);
@@ -939,12 +947,12 @@ function addRoutePopup(feature, layer) {
   playbackButton.textContent = 'Play Route';
   playbackButton.classList.add('animate__animated', 'animate__pulse');
   playbackButton.addEventListener('click', () => {
-      if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
-          startPlayback(feature.geometry.coordinates);
-      } else if (feature.geometry.type === 'MultiLineString') {
-          const validSegments = feature.geometry.coordinates.filter(segment => segment.length > 1);
-          validSegments.forEach(startPlayback);
-      }
+    if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
+      startPlayback(feature.geometry.coordinates);
+    } else if (feature.geometry.type === 'MultiLineString') {
+      const validSegments = feature.geometry.coordinates.filter(segment => segment.length > 1);
+      validSegments.forEach(startPlayback);
+    }
   });
 
   const popupContent = document.createElement('div');
@@ -1023,7 +1031,6 @@ function adjustPlaybackSpeed() {
     clearInterval(playbackAnimation);
     startPlayback(playbackPolyline.getLatLngs());
   }
-  animateElement(document.getElementById('speedValue'), 'animate__rubberBand');
 }
 
 // Filter historical data by a drawn polygon
@@ -1184,7 +1191,7 @@ function updateMapWithHistoricalData(data, fitBounds = false) {
     }
 
     const totalDistance = calculateTotalDistance(data.features);
-    animateStatUpdate('totalHistoricalDistance', `${totalDistance.toFixed(2)} miles`);
+    document.getElementById('totalHistoricalDistance').textContent = `${totalDistance.toFixed(2)} miles`;  
 
     showFeedback(`Displayed ${data.features.length} historical features`, 'success');
   } catch (error) {
@@ -1613,18 +1620,10 @@ function createAnimatedMarker(latLng, options = {}) {
 function animateStatUpdate(elementId, newValue) {
   const element = document.getElementById(elementId);
   if (element) {
-    animateElement(element, 'animate__flipInX');
     element.textContent = newValue;
   }
 }
 
-// Animate an element with a given animation class
-function animateElement(element, animationClass) {
-  element.classList.add('animate__animated', animationClass);
-  setTimeout(() => {
-    element.classList.remove('animate__animated', animationClass);
-  }, 1000);
-}
 
 function initializeDateRangeSlider() {
   const slider = document.getElementById('dateRangeSlider');

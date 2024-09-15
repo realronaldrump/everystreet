@@ -339,7 +339,11 @@ function initMap() {
       }
       map = L.map('map', {
         maxBounds: wacoOnlyMode ? MCLENNAN_COUNTY_BOUNDS.pad(0.1) : null,
-        minZoom: wacoOnlyMode ? 10 : null
+        minZoom: wacoOnlyMode ? 10 : null,
+        closePopupOnClick: false,
+        popupOptions: {
+          className: 'custom-popup-wrapper'
+        }
       });
 
       // Set a default view
@@ -951,25 +955,23 @@ async function loadWacoStreets() {
 
 // Add a popup to a route feature
 function addRoutePopup(feature, layer) {
+  console.log('Adding popup for feature:', feature);
+
   const timestamp = feature.properties.timestamp;
+  console.log('Raw timestamp:', timestamp);
+
   let formattedDate = 'N/A';
   let formattedTime = 'N/A';
 
-  // Debugging: Log the raw timestamp value
-  console.log('Raw timestamp:', timestamp);
-
   if (timestamp) {
     try {
-      // Parse the ISO 8601 timestamp
       const date = new Date(timestamp);
-
-      // Debugging: Log the parsed date object
       console.log('Parsed date:', date);
 
       if (!isNaN(date.getTime())) {
-        // Format the date and time
         formattedDate = date.toLocaleDateString();
         formattedTime = date.toLocaleTimeString();
+        console.log('Formatted date/time:', formattedDate, formattedTime);
       } else {
         console.error('Invalid date:', timestamp);
       }
@@ -981,11 +983,23 @@ function addRoutePopup(feature, layer) {
   }
 
   const distance = calculateTotalDistance([feature]);
+  console.log('Calculated distance:', distance);
 
-  const playbackButton = document.createElement('button');
+  const popupContent = L.DomUtil.create('div', 'custom-popup');
+  
+  const dateElement = L.DomUtil.create('p', 'popup-date', popupContent);
+  dateElement.textContent = `Date: ${formattedDate}`;
+  
+  const timeElement = L.DomUtil.create('p', 'popup-time', popupContent);
+  timeElement.textContent = `Time: ${formattedTime}`;
+  
+  const distanceElement = L.DomUtil.create('p', 'popup-distance', popupContent);
+  distanceElement.textContent = `Distance: ${distance.toFixed(2)} miles`;
+
+  const playbackButton = L.DomUtil.create('button', 'popup-button animate__animated animate__pulse', popupContent);
   playbackButton.textContent = 'Play Route';
-  playbackButton.classList.add('animate__animated', 'animate__pulse');
-  playbackButton.addEventListener('click', () => {
+  L.DomEvent.on(playbackButton, 'click', () => {
+    console.log('Playback button clicked');
     if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
       startPlayback(feature.geometry.coordinates);
     } else if (feature.geometry.type === 'MultiLineString') {
@@ -994,9 +1008,7 @@ function addRoutePopup(feature, layer) {
     }
   });
 
-  const popupContent = document.createElement('div');
-  popupContent.innerHTML = `Date: ${formattedDate}<br>Time: ${formattedTime}<br>Distance: ${distance.toFixed(2)} miles`;
-  popupContent.appendChild(playbackButton);
+  console.log('Popup content:', popupContent.innerHTML);
 
   layer.bindPopup(popupContent);
 }
@@ -1176,7 +1188,7 @@ async function exportToGPX() {
 
 // Update the map with historical data
 function updateMapWithHistoricalData(data, fitBounds = false) {
-  removeLayer(historicalDataLayer);
+  removeLayer(historicalDataLayer); // Remove previous layer if any
 
   if (!data || !data.features || data.features.length === 0) {
     showFeedback('No historical data available for the selected period.', 'info');
@@ -1184,44 +1196,30 @@ function updateMapWithHistoricalData(data, fitBounds = false) {
   }
 
   try {
-    if (L.glify && typeof L.glify.lines === 'function') {
-      const lines = data.features.map(feature => feature.geometry.coordinates);
-      
-      historicalDataLayer = L.glify.lines({
-        map: map,
-        data: lines,
-        color: (index, point) => [0, 0, 255],  // Blue color
-        opacity: 0.7,
+    // Use standard Leaflet GeoJSON layer
+    historicalDataLayer = L.geoJSON(data, {
+      style: {
+        color: '#0000FF', // Blue color
         weight: 3,
-        click: (e, feature, xy) => {
-          const popup = L.popup()
+        opacity: 0.7
+      },
+      onEachFeature: (feature, layer) => {
+        layer.on('click', (e) => {
+          L.popup()
             .setLatLng(e.latlng)
             .setContent(createPopupContent(feature))
             .openOn(map);
-        }
-      });
-    } else {
-      // Fallback to standard Leaflet GeoJSON layer
-      historicalDataLayer = L.geoJSON(data, {
-        style: {
-          color: '#0000FF',
-          weight: 3,
-          opacity: 0.35
-        },
-        onEachFeature: (feature, layer) => {
-          layer.on('click', (e) => {
-            L.popup()
-              .setLatLng(e.latlng)
-              .setContent(createPopupContent(feature))
-              .openOn(map);
-          });
-        }
-      }).addTo(map);
-    }
+        });
+      }
+    }).addTo(map);
 
     // Only fit bounds if explicitly requested
     if (fitBounds && data.features.length > 0) {
-      const bounds = L.latLngBounds(data.features.flatMap(f => f.geometry.coordinates.map(coord => L.latLng(coord[1], coord[0]))));
+      const bounds = L.latLngBounds(
+        data.features.flatMap(f => 
+          f.geometry.coordinates.map(coord => L.latLng(coord[1], coord[0]))
+        )
+      );
       if (bounds.isValid()) {
         map.fitBounds(bounds);
       } else {
@@ -1229,8 +1227,9 @@ function updateMapWithHistoricalData(data, fitBounds = false) {
       }
     }
 
+    // Calculate total distance if needed
     const totalDistance = calculateTotalDistance(data.features);
-    document.getElementById('totalHistoricalDistance').textContent = `${totalDistance.toFixed(2)} miles`;  
+    document.getElementById('totalHistoricalDistance').textContent = `${totalDistance.toFixed(2)} miles`;
 
     showFeedback(`Displayed ${data.features.length} historical features`, 'success');
   } catch (error) {

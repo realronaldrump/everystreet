@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import rtree
 import pickle
 import aiofiles
 import geopandas as gpd
@@ -154,8 +155,8 @@ class WacoStreetsAnalyzer:
                 # Perform spatial join instead of iterating
                 joined = gpd.sjoin(gdf, self.segments_gdf, how="inner", predicate="intersects")
                 
-                # Filter based on distance
-                close_segments = joined[joined.apply(lambda row: row.geometry.distance(self.segments_gdf.loc[row.index_right, 'geometry']) <= self.snap_distance, axis=1)]
+                # Fix: Correctly reference the geometry for distance calculation
+                close_segments = joined[joined.apply(lambda row: row.geometry.distance(self.segments_gdf.loc[row.index_right].geometry) <= self.snap_distance, axis=1)]
                 
                 # Update traveled_segments
                 self.traveled_segments.update(close_segments['segment_id'].tolist())
@@ -165,6 +166,7 @@ class WacoStreetsAnalyzer:
             logger.info("Progress update completed.")
         except Exception as e:
             logger.error("Error processing routes: %s", str(e), exc_info=True)
+
     def calculate_progress(self):
         logger.info("Calculating progress...")
         if self.segments_gdf is None:

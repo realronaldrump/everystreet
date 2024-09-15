@@ -867,6 +867,8 @@ async function loadProgressData() {
     const data = await fetchGeoJSON(`/progress_geojson?wacoBoundary=${wacoBoundary}`);
     
     const newProgressLayer = L.vectorGrid.slicer(data, {
+      maxZoom: 22,  // Increase this value
+      tolerance: 5, // Adjust this value
       rendererFactory: L.canvas.tile,
       vectorTileLayerStyles: {
         sliced: (properties) => ({
@@ -911,7 +913,7 @@ async function loadWacoStreets() {
       style: {
         color: '#808080',
         weight: 1,
-        opacity: 0.7
+        opacity: 0.6
       },
       pane: 'wacoStreetsPane',
       onEachFeature: (feature, layer) => {
@@ -1204,7 +1206,7 @@ function updateMapWithHistoricalData(data, fitBounds = false) {
         style: {
           color: '#0000FF',
           weight: 3,
-          opacity: 0.7
+          opacity: 0.35
         },
         onEachFeature: (feature, layer) => {
           layer.on('click', (e) => {

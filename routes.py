@@ -21,7 +21,6 @@ from functools import wraps
 
 logger = logging.getLogger(__name__)
 import os
-from config import Config
 
 config = Config(
     PIN=os.environ.get('PIN', ''),
@@ -37,8 +36,6 @@ config = Config(
     SECRET_KEY=os.environ.get('SECRET_KEY', '')
 )
 
-# Removed BouncieAPI instance creation here
-gpx_exporter = GPXExporter(None)
 from cachetools import TTLCache
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)

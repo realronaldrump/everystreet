@@ -1290,6 +1290,8 @@ async function displayHistoricalData(fitBounds = false) {
 
   try {
     await waitForMap();
+    const currentCenter = map.getCenter();
+    const currentZoom = map.getZoom();
     const filterWaco = document.getElementById('filterWaco').checked;
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const data = await fetchHistoricalData(null, null, filterWaco, wacoBoundary);
@@ -1309,8 +1311,8 @@ async function displayHistoricalData(fitBounds = false) {
     // Reload Waco streets layer with the new boundary and filter
     await loadWacoStreets();
 
-    // Ensure the map stays within McLennan County bounds
-    map.fitBounds(MCLENNAN_COUNTY_BOUNDS);
+    // Restore the previous view instead of fitting to bounds
+    map.setView(currentCenter, currentZoom);
 
   } catch (error) {
     console.error('Error displaying historical data:', error);
@@ -1322,7 +1324,6 @@ async function displayHistoricalData(fitBounds = false) {
     checkQueuedTasks();
   }
 }
-
 function waitForMap() {
   return new Promise((resolve) => {
     if (map && map.initialized) {

@@ -874,7 +874,7 @@ async function loadProgressData() {
         sliced: (properties) => ({
           color: properties.traveled ? '#00ff00' : '#ff0000',
           weight: 3,
-          opacity: 0.7
+          opacity: 0.4
         })
       },
       interactive: true

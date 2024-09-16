@@ -1153,38 +1153,6 @@ function filterRoutesBy(period) {
   displayHistoricalData();
 }
 
-// Export historical data to a GPX file
-async function exportToGPX() {
-  showLoading('Preparing GPX export...');
-  try {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const filterWaco = document.getElementById('filterWaco').checked;
-    const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
-
-    const url = `/export_gpx?startDate=${startDate}&endDate=${endDate}&filterWaco=${filterWaco}&wacoBoundary=${wacoBoundary}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = downloadUrl;
-    a.download = 'export.gpx';
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(downloadUrl);
-    showFeedback('GPX export completed. Check your downloads.', 'success');
-  } catch (error) {
-    console.error('Error exporting GPX:', error);
-    showFeedback('Error exporting GPX. Please try again.', 'error');
-  } finally {
-    hideLoading();
-  }
-}
 
 // Update the map with historical data
 function updateMapWithHistoricalData(data, fitBounds = false) {
@@ -1562,11 +1530,6 @@ if (toggleWacoOnlyModeBtn) {
     });
   }
 
-  // Export to GPX Button
-  const exportToGPXBtn = document.getElementById('exportToGPXBtn');
-  if (exportToGPXBtn) {
-    exportToGPXBtn.addEventListener('click', handleBackgroundTask(exportToGPX, 'Exporting to GPX...'));
-  }
 
   // Clear Drawn Shapes Button
   const clearDrawnShapesBtn = document.getElementById('clearDrawnShapesBtn');
@@ -1819,7 +1782,6 @@ window.mapApp = {
   loadProgressData,
   displayHistoricalData,
   clearLiveRoute,
-  exportToGPX,
   filterRoutesBy,
   clearDrawnShapes,
   togglePlayPause,

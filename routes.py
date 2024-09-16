@@ -1,4 +1,4 @@
-# This Python module, `routes.py`, is designed for a Quart web application. It defines various asynchronous routes and WebSocket endpoints for managing and interacting with geographical and historical data, specifically focusing on the Waco area. Key functionalities include fetching and filtering historical data, managing live route data, exporting data to GPX format, searching locations, and handling user authentication. The module also manages application startup and shutdown processes, ensuring proper task management and API client session handling. Caching is used to optimize data retrieval, and error handling is implemented throughout to ensure robust operation.
+# This Python module, `routes.py`, is designed for a Quart web application. It defines various asynchronous routes and WebSocket endpoints for managing and interacting with geographical and historical data, specifically focusing on the Waco area. Key functionalities include fetching and filtering historical data, managing live route data, searching locations, and handling user authentication. The module also manages application startup and shutdown processes, ensuring proper task management and API client session handling. Caching is used to optimize data retrieval, and error handling is implemented throughout to ensure robust operation.
 
 import asyncio
 import json
@@ -13,7 +13,6 @@ from quart import (Response, jsonify, redirect, render_template, request,
 
 from config import Config
 from date_utils import format_date, timedelta
-from gpx_exporter import GPXExporter
 from models import DateRange, HistoricalDataParams
 from tasks import load_historical_data_background, poll_bouncie_api
 from utils import geolocator, login_required
@@ -54,7 +53,6 @@ def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer
     geojson_handler = app.geojson_handler
     bouncie_api = app.bouncie_api
-    gpx_exporter = GPXExporter(geojson_handler)
 
     @app.route("/progress")
     async def get_progress():
@@ -243,40 +241,6 @@ def register_routes(app):
         # Handle WebSocket disconnection
         pass
 
-
-
-    @app.route("/export_gpx")
-    async def export_gpx():
-        start_date = request.args.get("startDate") or "2020-01-01"
-        end_date = request.args.get("endDate") or datetime.now(timezone.utc).strftime(
-            "%Y-%m-%d"
-        )
-        filter_waco = request.args.get("filterWaco", "false").lower() == "true"
-        waco_boundary = request.args.get("wacoBoundary", "city_limits")
-        try:
-            gpx_data = await gpx_exporter.export_to_gpx(
-                format_date(start_date),
-                format_date(end_date),
-                filter_waco,
-                waco_boundary,
-            )
-            if gpx_data is None:
-                logger.warning("No data found for GPX export")
-                return (
-                    jsonify({"error": "No data found for the specified date range"}),
-                    404,
-                )
-            return Response(
-                gpx_data,
-                mimetype="application/gpx+xml",
-                headers={"Content-Disposition": "attachment;filename=export.gpx"},
-            )
-        except Exception as e:
-            logger.error(f"Error in export_gpx: {str(e)}", exc_info=True)
-            return (
-                jsonify({"error": f"An error occurred while exporting GPX: {str(e)}"}),
-                500,
-            )
 
     @app.route("/search_location")
     async def search_location():

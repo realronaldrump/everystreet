@@ -1,12 +1,12 @@
 # This Python module, `routes.py`, is designed for a Quart web application. It defines various asynchronous routes and WebSocket endpoints for managing and interacting with geographical and historical data, specifically focusing on the Waco area. Key functionalities include fetching and filtering historical data, managing live route data, searching locations, and handling user authentication. The module also manages application startup and shutdown processes, ensuring proper task management and API client session handling. Caching is used to optimize data retrieval, and error handling is implemented throughout to ensure robust operation.
-
+import os
 import asyncio
 import json
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, time
 
 from cachetools import TTLCache
-from quart import (Response, jsonify, redirect, render_template, request,
+from quart import (jsonify, redirect, render_template, request,
                    session, url_for, websocket, make_response)
 
 from config import Config
@@ -17,7 +17,6 @@ from utils import geolocator, login_required
 from functools import wraps
 
 logger = logging.getLogger(__name__)
-import os
 
 config = Config(
     PIN=os.environ.get('PIN', ''),
@@ -35,6 +34,7 @@ config = Config(
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
 
+
 def no_cache(view_function):
     @wraps(view_function)
     async def no_cache_impl(*args, **kwargs):
@@ -44,7 +44,8 @@ def no_cache(view_function):
         response.headers['Expires'] = '-1'
         return response
     return no_cache_impl
-    
+
+
 def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer
     geojson_handler = app.geojson_handler
@@ -174,30 +175,30 @@ def register_routes(app):
 
     @app.websocket("/ws/live_route")
     async def ws_live_route():
-      try:
-        last_sent_time = 0  # Initialize to track the last time data was sent
+        try:
+            last_sent_time = 0  # Initialize to track the last time data was sent
 
-        while True:
-            current_time = time()  # Get the current timestamp
+            while True:
+                current_time = time()  # Get the current timestamp
 
-            # Calculate the time difference since the last update
-            time_diff = current_time - last_sent_time
+                # Calculate the time difference since the last update
+                time_diff = current_time - last_sent_time
 
-            if time_diff >= 1:  # Check if at least 1 second has passed
-                async with app.live_route_lock:
-                    data = app.live_route_data
+                if time_diff >= 1:  # Check if at least 1 second has passed
+                    async with app.live_route_lock:
+                        data = app.live_route_data
 
-                # Send the live route data to the client over the WebSocket connection
-                await websocket.send(json.dumps(data))
+                    # Send the live route data to the client over the WebSocket connection
+                    await websocket.send(json.dumps(data))
 
-                # Update the last_sent_time to the current time
-                last_sent_time = current_time
+                    # Update the last_sent_time to the current time
+                    last_sent_time = current_time
 
-            # Wait a small amount of time before the next check, e.g., 1 second
-            await asyncio.sleep(1)
-      except asyncio.CancelledError:
-        # Handle WebSocket disconnection
-        pass
+                # Wait a small amount of time before the next check, e.g., 1 second
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            # Handle WebSocket disconnection
+            pass
 
     @app.route("/historical_data_status")
     async def historical_data_status():
@@ -209,34 +210,32 @@ def register_routes(app):
                 }
             )
 
-
     @app.websocket("/ws/trip_metrics")
     async def ws_trip_metrics():
-      try:
-        last_sent_time = 0  # Initialize to track the last time data was sent
+        try: # Import time function
+            last_sent_time = 0  # Initialize to track the last time data was sent
 
-        while True:
-            current_time = time()  # Get the current timestamp
+            while True:
+                current_time = time()  # Get the current timestamp
 
-            # Calculate the time difference since the last update
-            time_diff = current_time - last_sent_time
+                # Calculate the time difference since the last update
+                time_diff = current_time - last_sent_time
 
-            if time_diff >= 1:  # Check if at least 1 seconds have passed
-                async with app.live_route_lock:
-                    formatted_metrics = await app.bouncie_api.get_trip_metrics()
+                if time_diff >= 1:  # Check if at least 1 seconds have passed
+                    async with app.live_route_lock:
+                        formatted_metrics = await app.bouncie_api.get_trip_metrics()
 
-                # Send the trip metrics to the client over the WebSocket connection
-                await websocket.send(json.dumps(formatted_metrics))
+                    # Send the trip metrics to the client over the WebSocket connection
+                    await websocket.send(json.dumps(formatted_metrics))
 
-                # Update the last_sent_time to the current time
-                last_sent_time = current_time
+                    # Update the last_sent_time to the current time
+                    last_sent_time = current_time
 
-            # Wait a small amount of time before the next check, e.g., 1 second
-            await asyncio.sleep(1)
-      except asyncio.CancelledError:
-        # Handle WebSocket disconnection
-        pass
-
+                # Wait a small amount of time before the next check, e.g., 1 second
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            # Handle WebSocket disconnection
+            pass
 
     @app.route("/search_location")
     async def search_location():
@@ -283,7 +282,7 @@ def register_routes(app):
             try:
                 app.is_processing = True
                 logger.info("Starting historical data update process")
-                
+
                 data = await request.get_json()
                 start_date = data.get('startDate')
                 end_date = data.get('endDate')
@@ -469,4 +468,3 @@ def register_routes(app):
             app.live_route_data = {"features": []}
             app.clear_live_route = True
         return jsonify({"message": "Live route cleared successfully"})
-

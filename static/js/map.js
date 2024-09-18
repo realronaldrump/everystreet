@@ -1153,7 +1153,6 @@ function filterRoutesBy(period) {
   displayHistoricalData();
 }
 
-
 // Update the map with historical data
 function updateMapWithHistoricalData(data, fitBounds = false) {
   removeLayer(historicalDataLayer); // Remove previous layer if any

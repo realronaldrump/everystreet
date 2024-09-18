@@ -121,38 +121,3 @@ class FileHandler:
                 logger.error(f"Invalid timestamp format: {timestamp}")
                 return None
         return float(timestamp)
-
-    async def filter_historical_data(self, start_date, end_date, waco_boundary, filter_waco):
-        filtered_features = []
-        for month_year, features in self.monthly_data.items():
-            for feature in features:
-                timestamp = self._parse_timestamp(feature['properties']['timestamp'])
-                if timestamp is None:
-                    continue
-                date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-                if start_date <= date <= end_date:
-                    if not filter_waco or self._is_within_waco(feature, waco_boundary):
-                        filtered_features.append(feature)
-        return {
-            "type": "FeatureCollection",
-            "features": filtered_features
-        }
-
-    def _is_within_waco(self, feature, waco_boundary):
-        # Get the Waco boundary polygon
-        waco_polygon = self.waco_analyzer.get_waco_boundary(waco_boundary)
-        
-        # Extract coordinates from the feature
-        coordinates = feature['geometry']['coordinates']
-        
-        # For LineString features
-        if feature['geometry']['type'] == 'LineString':
-            return any(waco_polygon.contains(Point(coord)) for coord in coordinates)
-        
-        # For Point features
-        elif feature['geometry']['type'] == 'Point':
-            return waco_polygon.contains(Point(coordinates))
-        
-        # For other geometry types, you may need to implement additional logic
-        else:
-            return False

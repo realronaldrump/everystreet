@@ -39,6 +39,7 @@ from cachetools import TTLCache
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
 
+
 def no_cache(view_function):
     @wraps(view_function)
     async def no_cache_impl(*args, **kwargs):
@@ -48,7 +49,8 @@ def no_cache(view_function):
         response.headers['Expires'] = '-1'
         return response
     return no_cache_impl
-    
+
+
 def register_routes(app):
     waco_analyzer = app.waco_streets_analyzer
     geojson_handler = app.geojson_handler

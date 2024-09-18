@@ -63,7 +63,8 @@ class BouncieAPI:
         return TripProcessor.create_geojson_features_from_trips(data)
 
 
-    async def find_first_data_date(self):
+    @staticmethod
+    async def find_first_data_date():
         # Implement this method to find the first date with data
         # For now, we'll return a default date
         return datetime(2020, 8, 1, tzinfo=timezone.utc)

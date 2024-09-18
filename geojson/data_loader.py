@@ -62,7 +62,8 @@ class DataLoader:
                 logger.error(f"Unexpected error loading historical data: {str(e)}", exc_info=True)
                 raise
 
-    def _get_monthly_files(self) -> List[str]:
+    @staticmethod
+    def _get_monthly_files() -> List[str]:
         try:
             return [
                 f
@@ -76,7 +77,8 @@ class DataLoader:
             logger.error("Permission denied when trying to access the 'static' directory.")
             return []
 
-    async def _process_file(self, file: str, fetched_trip_timestamps: Set[str]) -> tuple[List[Dict[str, Any]], str]:
+    @staticmethod
+    async def _process_file(file: str, fetched_trip_timestamps: Set[str]) -> tuple[List[Dict[str, Any]], str]:
         try:
             async with aiofiles.open(f"static/{file}", "r") as f:
                 data = json.loads(await f.read())

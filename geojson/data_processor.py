@@ -159,8 +159,9 @@ class DataProcessor:
             )
             raise
 
+    @staticmethod
     async def filter_features(
-        self, handler, start_date, end_date, filter_waco, waco_limits, bounds=None
+        handler, start_date, end_date, filter_waco, waco_limits, bounds=None
     ):
         start_datetime = get_start_of_day(start_date)
         end_datetime = get_end_of_day(end_date)

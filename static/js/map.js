@@ -27,7 +27,7 @@ let map = null;
 let wacoLimitsLayer = null;
 let progressLayer = null;
 let historicalDataLayer = null;
-let liveRoutePolyline = null; // Changed from const to let
+let liveRoutePolyline = null;
 let liveMarker = null;
 let playbackPolyline = null;
 let playbackMarker = null;
@@ -41,7 +41,7 @@ let isProcessing = false;
 let searchMarker = null;
 let centeringInterval = null;
 const processingQueue = [];
-let wacoOnlyMode = true; // only allow panning in/around waco
+let wacoOnlyMode = true;
 
 
 async function clearAllBrowserStorage() {
@@ -171,45 +171,60 @@ async function fetchInitialLiveRouteData() {
 }
 
 function updateLiveRouteOnMap(liveData) {
-  if (liveData && liveData.features && liveData.features.length > 0) {
-    const coordinates = liveData.features[0].geometry.coordinates;
-    if (coordinates.length > 0) {
-      // Convert coordinates to LatLng objects
-      const latLngs = coordinates.map(coord => L.latLng(coord[1], coord[0]));
+  if (!liveData || !liveData.features || liveData.features.length === 0) {
+    console.warn('Received invalid live data');
+    return;
+  }
 
-      if (!liveRoutePolyline) {
-        liveRoutePolyline = L.polyline(latLngs, {
-          color: '#ADD8E6',
-          weight: 3,
-          opacity: 0.7,
-          pane: 'liveRoutePane'
-        }).addTo(map);
-      } else {
-        const currentLatLngs = liveRoutePolyline.getLatLngs();
-        const newPoints = latLngs.slice(currentLatLngs.length);
+  const coordinates = liveData.features[0].geometry.coordinates;
+  if (!coordinates || coordinates.length === 0) {
+    console.warn('Received live data with no coordinates');
+    return;
+  }
 
-        if (newPoints.length > 0) {
-          newPoints.forEach((point, index) => {
-            setTimeout(() => {
-              currentLatLngs.push(point);
-              liveRoutePolyline.setLatLngs(currentLatLngs);
+  // Convert coordinates to LatLng objects
+  const latLngs = coordinates.map(coord => L.latLng(coord[1], coord[0]));
 
-              // Update marker position for the last point
-              if (index === newPoints.length - 1) {
-                liveMarker?.setLatLng(point) ?? (liveMarker = L.marker(point, { 
-                  icon: RED_BLINKING_MARKER_ICON,
-                  pane: 'liveRoutePane'
-                }).addTo(map));
+  if (!liveRoutePolyline) {
+    // Initialize the live route polyline if it doesn't exist
+    liveRoutePolyline = L.polyline(latLngs, {
+      color: '#ADD8E6',
+      weight: 3,
+      opacity: 0.7,
+      pane: 'liveRoutePane'
+    }).addTo(map);
+  } else {
+    const currentLatLngs = liveRoutePolyline.getLatLngs();
+    const newPoints = latLngs.slice(currentLatLngs.length);
 
-                // Only update the map view if centering is enabled
-                if (isCenteringOnLiveMarker) {
-                  updateMapCenter();
-                }
-              }
-            }, index * 50); // Adjust the delay (50ms) to control the animation speed
-          });
-        }
-      }
+    if (newPoints.length > 0) {
+      newPoints.forEach((point, index) => {
+        setTimeout(() => {
+          currentLatLngs.push(point);
+          liveRoutePolyline.setLatLngs(currentLatLngs);
+
+          // Update marker position for the last point
+          if (index === newPoints.length - 1) {
+            if (!liveMarker) {
+              liveMarker = L.marker(point, { 
+                icon: RED_BLINKING_MARKER_ICON,
+                pane: 'liveRoutePane'
+              }).addTo(map);
+            } else {
+              liveMarker.setLatLng(point);
+            }
+
+            // Update last known position
+            lastKnownPosition = [point.lng, point.lat];
+            localStorage.setItem('lastKnownPosition', JSON.stringify(lastKnownPosition));
+
+            // Only update the map view if centering is enabled
+            if (isCenteringOnLiveMarker) {
+              updateMapCenter();
+            }
+          }
+        }, index * 50); // Adjust the delay (50ms) to control the animation speed
+      });
     }
   }
 }
@@ -606,11 +621,11 @@ function updateWacoStreetsLayerVisibility() {
 }
 
 // Load live route data from the server
-async function loadLiveRouteData() {
+function loadLiveRouteData() {
   try {
     liveDataSocket.onmessage = function (event) {
       const data = JSON.parse(event.data);
-      
+
       if (data?.features?.[0]?.geometry?.coordinates?.length > 0) {
         const coordinates = data.features[0].geometry.coordinates.filter(coord => 
           Array.isArray(coord) && coord.length >= 2 && 
@@ -629,7 +644,7 @@ async function loadLiveRouteData() {
               pane: 'liveRoutePane'
             }).addTo(map);
           }
-          
+
           // Update the live marker position with the last coordinate
           const lastCoord = coordinates[coordinates.length - 1];
           if (liveMarker) {
@@ -637,7 +652,7 @@ async function loadLiveRouteData() {
           } else {
             liveMarker = L.marker(lastCoord, { icon: RED_BLINKING_MARKER_ICON }).addTo(map);
           }
-          
+
           // Adjust the map bounds to fit the live route
           map.fitBounds(liveRouteLayer.getBounds());
           showFeedback('Live route data loaded successfully', 'success');
@@ -725,6 +740,10 @@ function clearLiveRoute() {
     liveMarker = null;
   }
 
+  // Clear last known position
+  lastKnownPosition = null;
+  localStorage.removeItem('lastKnownPosition');
+
   // Send request to clear live route data on the server
   fetch('/clear_live_route', { method: 'POST' })
     .then(response => response.json())
@@ -735,7 +754,6 @@ function clearLiveRoute() {
       showFeedback('Error clearing live route', 'error');
     });
 }
-
 // Update the progress bar and text
 async function updateProgress() {
   try {

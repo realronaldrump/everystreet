@@ -3,6 +3,8 @@ if (typeof L === 'undefined') {
   console.error('Leaflet is not loaded. Make sure to include Leaflet before this script.');
 }
 
+/* global L, turf */
+
 // Global constants
 const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
   L.latLng(31.3501, -97.4585), // Southwest corner

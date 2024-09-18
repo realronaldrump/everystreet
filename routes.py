@@ -4,8 +4,6 @@ import asyncio
 import json
 import logging
 from datetime import date, datetime, timezone
-from time import time
-
 
 from cachetools import TTLCache
 from quart import (Response, jsonify, redirect, render_template, request,

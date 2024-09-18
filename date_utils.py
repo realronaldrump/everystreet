@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta, timezone
-from typing import Union
+from datetime import datetime, timedelta, timezone, date
+from typing import Iterator, Union
 
 
 def parse_date(date_string: Union[str, datetime]) -> datetime:
@@ -56,9 +56,6 @@ def get_end_of_day(date: Union[str, datetime]) -> datetime:
         hour=23, minute=59, second=59, microsecond=999999
     )
 
-
-from typing import Iterator, Union
-from datetime import datetime, date
 
 def date_range(
     start_date: Union[str, datetime], end_date: Union[str, datetime]

@@ -33,8 +33,6 @@ config = Config(
     SECRET_KEY=os.environ.get('SECRET_KEY', '')
 )
 
-from cachetools import TTLCache
-
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
 
 def no_cache(view_function):

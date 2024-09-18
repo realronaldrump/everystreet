@@ -2,9 +2,7 @@
 if (typeof L === 'undefined') {
   console.error('Leaflet is not loaded. Make sure to include Leaflet before this script.');
 }
-
 /* global L, turf */
-
 // Global constants
 const MCLENNAN_COUNTY_BOUNDS = L.latLngBounds(
   L.latLng(31.3501, -97.4585), // Southwest corner
@@ -23,7 +21,6 @@ const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsBaseUrl = `${wsProtocol}//${window.location.host}`;
 
 let liveDataSocket = null;
-let metricsSocket = null;
 
 // Global variables
 let map = null;
@@ -42,23 +39,17 @@ let currentCoordIndex = 0;
 let playbackAnimation = null;
 let isProcessing = false;
 let searchMarker = null;
-let liveDataFetchController = null;
-let isCenteringOnLiveMarker = false;
-let centeringInterval;
+let centeringInterval = null;
 const processingQueue = [];
 let wacoOnlyMode = true; // only allow panning in/around waco
 
 
 async function clearAllBrowserStorage() {
-  console.log('Clearing all browser storage...');
-
   // Clear localStorage
   localStorage.clear();
-  console.log('localStorage cleared');
 
   // Clear sessionStorage
   sessionStorage.clear();
-  console.log('sessionStorage cleared');
 
   // Clear cookies
   const cookies = document.cookie.split(";");
@@ -68,14 +59,12 @@ async function clearAllBrowserStorage() {
       const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
       document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
   }
-  console.log('Cookies cleared');
 
   // Clear cache storage
   if ('caches' in window) {
       try {
           const cacheNames = await caches.keys();
           await Promise.all(cacheNames.map(name => caches.delete(name)));
-          console.log('Cache storage cleared');
       } catch (error) {
           console.error('Error clearing cache storage:', error);
       }
@@ -86,31 +75,15 @@ async function clearAllBrowserStorage() {
   databases.forEach(db => {
       indexedDB.deleteDatabase(db.name);
   });
-  console.log('IndexedDB cleared');
 
   // Clear service worker caches
   if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
-      for(let registration of registrations) {
+      for (const registration of registrations) {
           await registration.unregister();
       }
-      console.log('Service worker caches cleared');
   }
 }
-
-// Function to force a hard reload of the page
-function forceReload() {
-  clearAllBrowserStorage().then(() => {
-      console.log('All browser storage cleared. Reloading page...');
-      window.location.reload(true);
-  });
-}
-
-// Call clearAllBrowserStorage when the page is about to unload
-window.addEventListener('beforeunload', clearAllBrowserStorage);
-
-// Call clearAllBrowserStorage when the page loads to ensure a fresh start
-window.addEventListener('load', clearAllBrowserStorage);
 
 window.addEventListener('beforeunload', () => {
   if (centeringInterval) {
@@ -121,12 +94,30 @@ window.addEventListener('beforeunload', () => {
 function setupWebSocketConnections() {
   const connectWebSocket = (url, handlers) => {
     const socket = new WebSocket(url);
+    
+    socket.onopen = () => {
+      console.log('WebSocket connection established');
+      showFeedback('Live route connection established', 'success');
+    };
+
     socket.onmessage = handlers.onmessage;
-    socket.onerror = handlers.onerror;
-    socket.onclose = () => {
-      console.log('WebSocket connection closed. Reconnecting...');
+    
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      showFeedback('Error in WebSocket connection', 'error');
+      handlers.onerror(error);
+    };
+    
+    socket.onclose = (event) => {
+      if (event.wasClean) {
+        console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
+      } else {
+        console.error('WebSocket connection abruptly closed');
+        showFeedback('Live route connection lost. Reconnecting...', 'warning');
+      }
       setTimeout(() => connectWebSocket(url, handlers), 5000);
     };
+
     return socket;
   };
 
@@ -136,19 +127,7 @@ function setupWebSocketConnections() {
       updateLiveRouteOnMap(liveData);
     },
     onerror: (error) => {
-      console.error('WebSocket error:', error);
-      showFeedback('Error in WebSocket connection', 'error');
-    }
-  });
-
-  metricsSocket = connectWebSocket(`${wsBaseUrl}/ws/trip_metrics`, {
-    onmessage: (event) => {
-      const metrics = JSON.parse(event.data);
-      updateMetrics(metrics);
-    },
-    onerror: (error) => {
-      console.error('WebSocket error:', error);
-      showFeedback('Error in WebSocket connection', 'error');
+      console.error('Error in live route WebSocket:', error);
     }
   });
 
@@ -181,18 +160,16 @@ async function fetchInitialLiveRouteData() {
     if (initialData && initialData.features && initialData.features.length > 0) {
       updateLiveRouteOnMap(initialData);
       // Store the last position
-      const coordinates = initialData.features[0].geometry.coordinates;
+      const coordinates = initialData?.features?.[0]?.geometry?.coordinates;
       if (coordinates && coordinates.length > 0) {
         localStorage.setItem('lastKnownPosition', JSON.stringify(coordinates[coordinates.length - 1]));
       }
-    } else {
-      console.log('No live route data available');
     }
   } catch (error) {
-    console.error('Error fetching initial live route data:', error);
     showFeedback('Error fetching initial live route data', 'error');
   }
 }
+
 function updateLiveRouteOnMap(liveData) {
   if (liveData && liveData.features && liveData.features.length > 0) {
     const coordinates = liveData.features[0].geometry.coordinates;
@@ -219,14 +196,10 @@ function updateLiveRouteOnMap(liveData) {
 
               // Update marker position for the last point
               if (index === newPoints.length - 1) {
-                if (liveMarker) {
-                  liveMarker.setLatLng(point);
-                } else {
-                  liveMarker = L.marker(point, { 
-                    icon: RED_BLINKING_MARKER_ICON,
-                    pane: 'liveRoutePane'
-                  }).addTo(map);
-                }
+                liveMarker?.setLatLng(point) ?? (liveMarker = L.marker(point, { 
+                  icon: RED_BLINKING_MARKER_ICON,
+                  pane: 'liveRoutePane'
+                }).addTo(map));
 
                 // Only update the map view if centering is enabled
                 if (isCenteringOnLiveMarker) {
@@ -243,7 +216,6 @@ function updateLiveRouteOnMap(liveData) {
 
 function updateMetrics(metrics) {
   if (!metrics) {
-    console.warn('No metrics data received');
     return;
   }
 
@@ -260,8 +232,6 @@ function updateMetrics(metrics) {
   updateElement('startTime', new Date(metrics.start_time).toLocaleString());
   updateElement('endTime', new Date(metrics.end_time).toLocaleString());
 }
-
-setupWebSocketConnections();
 
 // Custom marker icons
 const BLUE_BLINKING_MARKER_ICON = L.divIcon({
@@ -300,7 +270,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           initProgressLayer(),
           initWacoStreetsLayer(),
           loadHistoricalData().catch(error => {
-              console.error('Historical data loading failed:', error);
               showFeedback('Error loading historical data. Some features may be unavailable.', 'error');
           }),
       ]);
@@ -417,7 +386,6 @@ function initMap() {
         resolve(map);
       });
     } catch (error) {
-      console.error('Error initializing map:', error);
       showFeedback('Error initializing map. Please try again.', 'error');
       reject(error);
     }
@@ -457,7 +425,6 @@ async function initWacoLimitsLayer() {
     });
     updateWacoLimitsLayerVisibility();
   } catch (error) {
-    console.error('Error initializing Waco limits layer:', error);
     showFeedback('Error loading Waco limits. Some features may be unavailable.', 'error');
   }
 }
@@ -502,7 +469,6 @@ async function initProgressLayer() {
     });
     updateProgressLayerVisibility();
   } catch (error) {
-    console.error('Error initializing progress layer:', error);
     showFeedback('Error loading progress data. Some features may be unavailable.', 'error');
   }
 }
@@ -577,7 +543,6 @@ async function initWacoStreetsLayer() {
     updateWacoStreetsLayerVisibility();
     showFeedback('Waco streets displayed', 'success');
   } catch (error) {
-    console.error('Error initializing Waco streets layer:', error);
     showFeedback('Error loading Waco streets. Some features may be unavailable.', 'error');
   }
 }
@@ -623,7 +588,6 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
 
     return await response.json();
   } catch (error) {
-    console.error('Error fetching historical data:', error);
     showFeedback('Error fetching historical data. Please try again.', 'error');
     return { type: "FeatureCollection", features: [] };  // Return empty GeoJSON
   }
@@ -652,7 +616,7 @@ async function loadLiveRouteData() {
           Array.isArray(coord) && coord.length >= 2 && 
           !isNaN(coord[0]) && !isNaN(coord[1])
         );
-        let liveRouteLayer; 
+        let liveRouteLayer = null;
         if (coordinates.length > 0) {
           // Update or create the polyline layer on the map with new coordinates
           if (liveRouteLayer) {
@@ -686,7 +650,6 @@ async function loadLiveRouteData() {
     };
 
     liveDataSocket.onclose = function () {
-      console.log("WebSocket connection closed");
     };
   } catch (error) {
     handleError(error, 'loading live route data');
@@ -737,12 +700,10 @@ function toggleWacoOnlyMode() {
       ]).then(() => {
         showFeedback(`Waco-only mode ${wacoOnlyMode ? 'enabled' : 'disabled'}`, 'info');
       }).catch(error => {
-        console.error('Error reinitializing layers:', error);
         showFeedback('Error updating map layers. Please try again.', 'error');
       });
     });
   }).catch(error => {
-    console.error('Error initializing map:', error);
     showFeedback('Error initializing map. Please try again.', 'error');
   });
 }
@@ -759,70 +720,22 @@ function clearLiveRoute() {
     liveRoutePolyline = null;
   }
 
+  if (liveMarker) {
+    map.removeLayer(liveMarker);
+    liveMarker = null;
+  }
+
   // Send request to clear live route data on the server
   fetch('/clear_live_route', { method: 'POST' })
     .then(response => response.json())
     .then(data => {
-      console.log(data.message);
       showFeedback('Live route cleared', 'info');
     })
     .catch(error => {
-      console.error('Error clearing live route:', error);
       showFeedback('Error clearing live route', 'error');
     });
 }
 
-
-
-// Update live data on the map
-function updateLiveData(liveData) {
-  removeLayer(liveMarker);
-  if (liveData && typeof liveData.latitude === 'number' && typeof liveData.longitude === 'number') {
-    const latLng = [liveData.latitude, liveData.longitude];
-    liveMarker = L.marker(latLng, { icon: BLUE_BLINKING_MARKER_ICON }).addTo(map);
-    
-    if (!liveRoutePolyline) {
-      liveRoutePolyline = L.polyline([], { color: 'red', weight: 3 }).addTo(map);
-    }
-    liveRoutePolyline.addLatLng(latLng);
-  } else {
-    console.warn('Invalid live data received:', liveData);
-    showFeedback('Invalid live data received', 'warning');
-  }
-}
-
-
-// Update the animateStatUpdates function as well
-function animateStatUpdates(metrics) {
-  if (!metrics || Object.keys(metrics).length === 0) return;
-
-  const updateQueue = [];
-
-  Object.entries(metrics).forEach(([imei, deviceMetrics]) => {
-    if (deviceMetrics) {
-      updateQueue.push(() => {
-        if (deviceMetrics.total_distance !== undefined) {
-          animateStatUpdate('totalDistance', `${deviceMetrics.total_distance.toFixed(2)} miles`);
-        }
-        if (deviceMetrics.total_time !== undefined) {
-          animateStatUpdate('totalTime', deviceMetrics.total_time);
-        }
-        if (deviceMetrics.max_speed !== undefined) {
-          animateStatUpdate('maxSpeed', `${deviceMetrics.max_speed.toFixed(2)} mph`);
-        }
-        if (deviceMetrics.start_time) {
-          animateStatUpdate('startTime', new Date(deviceMetrics.start_time).toLocaleString());
-        }
-        if (deviceMetrics.end_time) {
-          animateStatUpdate('endTime', new Date(deviceMetrics.end_time).toLocaleString());
-        }
-      });
-    }
-  });
-
-  // Execute updates sequentially
-  updateQueue.reduce((promise, update) => promise.then(update), Promise.resolve());
-}
 // Update the progress bar and text
 async function updateProgress() {
   try {
@@ -850,10 +763,8 @@ async function updateProgress() {
       updateStatCard('streetsRemaining', data.total_streets - data.traveled_streets);
       updateStatCard('percentageDriven', `${(data.traveled_streets / data.total_streets * 100).toFixed(2)}%`);
     } else {
-      console.warn("Progress data is incomplete or DOM elements not found");
     }
   } catch (error) {
-    console.error('Error fetching progress:', error);
   }
 }
 
@@ -896,7 +807,6 @@ async function loadProgressData() {
     showFeedback('Progress data loaded successfully', 'success');
     return progressLayer;
   } catch (error) {
-    console.error('Error loading progress data:', error);
     showFeedback('Error loading progress data. Please try again.', 'error');
     return null;
   }
@@ -950,17 +860,13 @@ async function loadWacoStreets() {
     updateWacoStreetsLayerVisibility();
     showFeedback('Waco streets displayed', 'success');
   } catch (error) {
-    console.error('Error initializing Waco streets layer:', error);
     showFeedback('Error loading Waco streets. Some features may be unavailable.', 'error');
   }
 }
 
 // Add a popup to a route feature
 function addRoutePopup(feature, layer) {
-  console.log('Adding popup for feature:', feature);
-
-  const timestamp = feature.properties.timestamp;
-  console.log('Raw timestamp:', timestamp);
+  const timestamp = feature?.properties?.timestamp;
 
   let formattedDate = 'N/A';
   let formattedTime = 'N/A';
@@ -968,24 +874,16 @@ function addRoutePopup(feature, layer) {
   if (timestamp) {
     try {
       const date = new Date(timestamp);
-      console.log('Parsed date:', date);
 
       if (!isNaN(date.getTime())) {
         formattedDate = date.toLocaleDateString();
         formattedTime = date.toLocaleTimeString();
-        console.log('Formatted date/time:', formattedDate, formattedTime);
-      } else {
-        console.error('Invalid date:', timestamp);
       }
     } catch (error) {
-      console.error('Error parsing date:', error);
     }
-  } else {
-    console.warn('No timestamp provided for feature');
   }
 
   const distance = calculateTotalDistance([feature]);
-  console.log('Calculated distance:', distance);
 
   const popupContent = L.DomUtil.create('div', 'custom-popup');
   
@@ -1001,7 +899,6 @@ function addRoutePopup(feature, layer) {
   const playbackButton = L.DomUtil.create('button', 'popup-button animate__animated animate__pulse', popupContent);
   playbackButton.textContent = 'Play Route';
   L.DomEvent.on(playbackButton, 'click', () => {
-    console.log('Playback button clicked');
     if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
       startPlayback(feature.geometry.coordinates);
     } else if (feature.geometry.type === 'MultiLineString') {
@@ -1010,17 +907,14 @@ function addRoutePopup(feature, layer) {
     }
   });
 
-  console.log('Popup content:', popupContent.innerHTML);
-
   layer.bindPopup(popupContent);
 }
 
 // Calculate the total distance of a set of features
 function calculateTotalDistance(features) {
   return features.reduce((total, feature) => {
-    const coords = feature.geometry.coordinates;
+    const coords = feature?.geometry?.coordinates;
     if (!coords || coords.length < 2) {
-      console.error('Invalid coordinates:', coords);
       return total;
     }
     return total + coords.reduce((routeTotal, coord, index) => {
@@ -1192,7 +1086,6 @@ function updateMapWithHistoricalData(data, fitBounds = false) {
       if (bounds.isValid()) {
         map.fitBounds(bounds);
       } else {
-        console.warn('Invalid bounds for historical data');
       }
     }
 
@@ -1202,13 +1095,12 @@ function updateMapWithHistoricalData(data, fitBounds = false) {
 
     showFeedback(`Displayed ${data.features.length} historical features`, 'success');
   } catch (error) {
-    console.error('Error updating map with historical data:', error);
     showFeedback('Error displaying historical data on the map. Please try again.', 'error');
   }
 }
 
 function createPopupContent(feature) {
-  const timestamp = feature.properties.timestamp;
+  const timestamp = feature?.properties?.timestamp;
   let formattedDate = 'N/A';
   let formattedTime = 'N/A';
 
@@ -1220,7 +1112,6 @@ function createPopupContent(feature) {
         formattedTime = date.toLocaleTimeString();
       }
     } catch (error) {
-      console.error('Error parsing date:', error);
     }
   }
 
@@ -1235,7 +1126,7 @@ function createPopupContent(feature) {
   `;
   
   popupContent.querySelector('.playback-btn').addEventListener('click', () => {
-    if (feature.geometry.type === 'LineString' && feature.geometry.coordinates.length > 1) {
+    if (feature.geometry.type === 'LineString' && feature?.geometry?.coordinates?.length > 1) {
       startPlayback(feature.geometry.coordinates);
     } else if (feature.geometry.type === 'MultiLineString') {
       const validSegments = feature.geometry.coordinates.filter(segment => segment.length > 1);
@@ -1262,7 +1153,7 @@ async function displayHistoricalData(fitBounds = false) {
     const currentZoom = map.getZoom();
     const filterWaco = document.getElementById('filterWaco').checked;
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
-    const data = await fetchHistoricalData(null, null, filterWaco, wacoBoundary);
+    const data = await fetchHistoricalData();
     
     if (data && data.features) {
       updateMapWithHistoricalData(data, fitBounds);
@@ -1283,7 +1174,6 @@ async function displayHistoricalData(fitBounds = false) {
     map.setView(currentCenter, currentZoom);
 
   } catch (error) {
-    console.error('Error displaying historical data:', error);
     showFeedback(`Error loading historical data: ${error.message}. Please try again.`, 'error');
   } finally {
     isProcessing = false;
@@ -1309,7 +1199,7 @@ function waitForMap() {
 
 // Disable filter controls
 function disableFilterControls() {
-  ['#time-filters button', '#applyFilterBtn', '#filterWaco', '#startDate', '#endDate', '#wacoBoundarySelect']
+  ['#time-filters button', '#applyFilterBtn', '#filterWaco', '#startDate', '#endDate', '#wacoBoundarySelect', '#updateDataBtn']
     .forEach(selector => {
       document.querySelectorAll(selector).forEach(el => el.disabled = true);
     });
@@ -1317,7 +1207,7 @@ function disableFilterControls() {
 
 // Enable filter controls
 function enableFilterControls() {
-  ['#time-filters button', '#applyFilterBtn', '#filterWaco', '#startDate', '#endDate', '#wacoBoundarySelect']
+  ['#time-filters button', '#applyFilterBtn', '#filterWaco', '#startDate', '#endDate', '#wacoBoundarySelect', '#updateDataBtn']
     .forEach(selector => {
       document.querySelectorAll(selector).forEach(el => el.disabled = false);
     });
@@ -1343,10 +1233,10 @@ function setupEventListeners() {
   const filterWacoEl = document.getElementById('filterWaco');
   const applyFilterBtnEl = document.getElementById('applyFilterBtn');
 
-  if (startDateEl) startDateEl.addEventListener('change', () => displayHistoricalData(false));
-  if (endDateEl) endDateEl.addEventListener('change', () => displayHistoricalData(false));
-  if (filterWacoEl) filterWacoEl.addEventListener('change', () => displayHistoricalData(false));
-  if (applyFilterBtnEl) applyFilterBtnEl.addEventListener('click', () => displayHistoricalData(false));
+  startDateEl?.addEventListener('change', () => displayHistoricalData(false));
+  endDateEl?.addEventListener('change', () => displayHistoricalData(false));
+  filterWacoEl?.addEventListener('change', () => displayHistoricalData(false));
+  applyFilterBtnEl?.addEventListener('click', () => displayHistoricalData(false));
 
   // Waco Boundary Select Event Listener
   if (wacoBoundarySelectEl) {
@@ -1368,13 +1258,10 @@ function setupEventListeners() {
     });
   }
   const centerLiveMarkerBtn = document.getElementById('centerLiveMarkerBtn');
-  if (centerLiveMarkerBtn) {
-    centerLiveMarkerBtn.addEventListener('click', toggleCenterOnLiveMarker);
-  }
+  centerLiveMarkerBtn?.addEventListener('click', toggleCenterOnLiveMarker);
+  
   const toggleWacoOnlyModeBtn = document.getElementById('toggleWacoOnlyModeBtn');
-if (toggleWacoOnlyModeBtn) {
-  toggleWacoOnlyModeBtn.addEventListener('click', toggleWacoOnlyMode);
-}
+  toggleWacoOnlyModeBtn?.addEventListener('click', toggleWacoOnlyMode);
 
 
 
@@ -1384,10 +1271,10 @@ if (toggleWacoOnlyModeBtn) {
   const wacoLimitsCheckboxEl = document.getElementById('wacoLimitsCheckbox');
   const progressLayerCheckboxEl = document.getElementById('progressLayerCheckbox');
 
-  if (historicalDataCheckboxEl) historicalDataCheckboxEl.addEventListener('change', updateHistoricalDataLayerVisibility);
-  if (wacoStreetsCheckboxEl) wacoStreetsCheckboxEl.addEventListener('change', updateWacoStreetsLayerVisibility);
-  if (wacoLimitsCheckboxEl) wacoLimitsCheckboxEl.addEventListener('change', updateWacoLimitsLayerVisibility);
-  if (progressLayerCheckboxEl) progressLayerCheckboxEl.addEventListener('change', updateProgressLayerVisibility);
+  historicalDataCheckboxEl?.addEventListener('change', updateHistoricalDataLayerVisibility);
+  wacoStreetsCheckboxEl?.addEventListener('change', updateWacoStreetsLayerVisibility);
+  wacoLimitsCheckboxEl?.addEventListener('change', updateWacoLimitsLayerVisibility);
+  progressLayerCheckboxEl?.addEventListener('change', updateProgressLayerVisibility);
 
   // Initialize the date range slider
   initializeDateRangeSlider();
@@ -1432,22 +1319,16 @@ if (toggleWacoOnlyModeBtn) {
 
   // Playback Controls
   const playPauseBtn = document.getElementById('playPauseBtn');
-  if (playPauseBtn) {
-    playPauseBtn.addEventListener('click', togglePlayPause);
-  }
+  playPauseBtn?.addEventListener('click', togglePlayPause);
 
   const stopBtn = document.getElementById('stopBtn');
-  if (stopBtn) {
-    stopBtn.addEventListener('click', () => {
+  stopBtn?.addEventListener('click', () => {
       stopPlayback();
       showFeedback('Playback stopped', 'info');
     });
-  }
 
   const playbackSpeedInput = document.getElementById('playbackSpeed');
-  if (playbackSpeedInput) {
-    playbackSpeedInput.addEventListener('input', adjustPlaybackSpeed);
-  }
+  playbackSpeedInput?.addEventListener('input', adjustPlaybackSpeed);
 
   // Search Controls
   const searchInput = document.getElementById('searchInput');
@@ -1506,7 +1387,6 @@ if (toggleWacoOnlyModeBtn) {
           });
         }
       } catch (error) {
-        console.error('Error fetching search suggestions:', error);
       }
     }, 300));
 
@@ -1534,17 +1414,14 @@ if (toggleWacoOnlyModeBtn) {
 
   // Clear Drawn Shapes Button
   const clearDrawnShapesBtn = document.getElementById('clearDrawnShapesBtn');
-  if (clearDrawnShapesBtn) {
-    clearDrawnShapesBtn.addEventListener('click', handleBackgroundTask(() => {
+  clearDrawnShapesBtn?.addEventListener('click', handleBackgroundTask(() => {
       clearDrawnShapes();
       displayHistoricalData(true); // Fit bounds after clearing shapes
     }, 'Clearing drawn shapes...'));
-  }
 
   // Reset Progress Button
   const resetProgressBtn = document.getElementById('resetProgressBtn');
-  if (resetProgressBtn) {
-    resetProgressBtn.addEventListener('click', handleBackgroundTask(async () => {
+  resetProgressBtn?.addEventListener('click', handleBackgroundTask(async () => {
       try {
         const response = await fetch('/reset_progress', { method: 'POST' });
         const data = await response.json();
@@ -1563,23 +1440,18 @@ if (toggleWacoOnlyModeBtn) {
         throw new Error('Error resetting progress: ' + error.message);
       }
     }, 'Resetting progress...'));
-  }
 
   // Streets Filter Select
   const streetsSelect = document.getElementById('streets-select');
-  if (streetsSelect) {
-    streetsSelect.addEventListener('change', () => {
+  streetsSelect?.addEventListener('change', () => {
       loadWacoStreets();
     });
-  }
 
   // Logout Button
   const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
+  logoutBtn?.addEventListener('click', () => {
       window.location.href = '/logout';
     });
-  }
 }
 
 // Utility Functions
@@ -1632,7 +1504,7 @@ function initializeDateRangeSlider() {
   const slider = document.getElementById('dateRangeSlider');
   const valueDisplay = document.getElementById('dateRangeValue');
   
-  slider.addEventListener('input', function() {
+  slider?.addEventListener('input', function() {
     const days = this.value;
     valueDisplay.textContent = days === '365' ? 'All Time' : `${days} days`;
   });
@@ -1680,10 +1552,14 @@ function showFeedback(message, type = 'info', duration = FEEDBACK_DURATION) {
   notificationList.appendChild(listItem);
 
   // Update notification count
-  const currentCount = parseInt(notificationCount.textContent, 10);
+  const currentCount = parseInt(notificationCount.textContent, 10) || 0; // Handle NaN
   notificationCount.textContent = currentCount + 1;
 
-  console.log(`${type.toUpperCase()}: ${message}`); // Log all feedback messages
+  // Auto-remove feedback message after duration
+  setTimeout(() => {
+    notificationList.removeChild(listItem);
+    notificationCount.textContent = Math.max(0, currentCount); // Prevent negative count
+  }, duration);
 }
 
 // Toggle notification panel visibility
@@ -1693,7 +1569,6 @@ document.getElementById('notification-icon').addEventListener('click', () => {
 });
 
 function handleError(error, context) {
-  console.error(`Error in ${context}:`, error);
   showFeedback(`An error occurred while ${context}. Please try again.`, 'error');
 }
 
@@ -1711,7 +1586,6 @@ function handleBackgroundTask(taskFunction, feedbackMessage) {
     try {
       await taskFunction(...args);
     } catch (error) {
-      console.error('Task failed:', error);
       showFeedback(`Error: ${error.message}`, 'error');
     } finally {
       isProcessing = false;
@@ -1764,10 +1638,6 @@ function yesterday() {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 }
 
-function daysAgoDaysAgo(daysAgo) {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);
-}
 
 function formatDate(date) {
   return date.toISOString().slice(0, 10);

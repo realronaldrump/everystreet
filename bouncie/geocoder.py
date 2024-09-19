@@ -22,9 +22,10 @@ class Geocoder:
                     formatted_address += f"{address.get('building', '')}<br>"
                     formatted_address += f"{address.get('house_number', '')} {address.get('road', '')}<br>"
                     formatted_address += f"{address.get('city', '')}, {address.get('state', '')} {address.get('postcode', '')}"
-                    return formatted_address.strip("<br>")
 
-                return "N/A"
+                    logger.debug("Geocoding successful: %s", formatted_address)
+                    return formatted_address.strip("<br>")
+                return "N/A"  # Only return "N/A" if location is not found
             except Exception as e:
                 logger.error(
                     "Reverse geocoding attempt %d failed with error: %s", attempt + 1, e

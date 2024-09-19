@@ -13,7 +13,6 @@ from .file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
 
-
 class DataProcessor:
     def __init__(self, waco_analyzer, bouncie_api):
         self.waco_analyzer = waco_analyzer
@@ -276,5 +275,5 @@ class DataProcessor:
             logger.info(f"Streets after filtering: {len(street_network)}")
             return street_network.to_json()
         except Exception as e:
-            logger.error(f"Error in get_waco_streets: {str(e)}, exc_info=True")
+            logger.error(f"Error in get_waco_streets: {str(e)}", exc_info=True)
             return json.dumps({"error": str(e)})

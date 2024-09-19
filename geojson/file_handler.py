@@ -9,14 +9,14 @@ import aiohttp
 import time
 
 # Set up logger
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # Changed to DEBUG for more detailed logging
 logger = logging.getLogger(__name__)
 
 # Constants
 FEATURE_COLLECTION_TYPE = "FeatureCollection"
 EPSG_4326 = "EPSG:4326"
 OSRM_API_URL = "http://router.project-osrm.org/match/v1/driving/"
-MAX_COORDINATES_PER_REQUEST = 100  # OSRM typically limits to 100 coordinates per request
+MAX_COORDINATES_PER_REQUEST = 100
 REQUEST_RATE_LIMIT = 1  # One request per second
 
 class FileHandler:
@@ -67,97 +67,84 @@ class FileHandler:
                 "Updated monthly files for %d months", len(months_to_update)
             )
 
-@staticmethod
-async def _map_match_feature(feature):
-    """
-    Performs map matching on a single feature using the OSRM API.
+    @staticmethod
+    async def _map_match_feature(feature):
+        coordinates = feature["geometry"]["coordinates"]
+        coord_chunks = [coordinates[i:i + MAX_COORDINATES_PER_REQUEST]
+                        for i in range(0, len(coordinates), MAX_COORDINATES_PER_REQUEST)]
+        matched_coords = []
 
-    Args:
-        feature (dict): A GeoJSON feature to be map matched.
-
-    Returns:
-        dict: The map matched GeoJSON feature.
-    """
-    coordinates = feature["geometry"]["coordinates"]
-
-    # Split coordinates into chunks of MAX_COORDINATES_PER_REQUEST
-    coord_chunks = [coordinates[i:i + MAX_COORDINATES_PER_REQUEST]
-                    for i in range(0, len(coordinates), MAX_COORDINATES_PER_REQUEST)]
-
-    matched_coords = []
-
-    async def fetch_matching(session, chunk):
-        """
-        Fetch the map-matching result for a chunk of coordinates.
-        """
-        coords_str = ";".join([f"{lon},{lat}" for lon, lat in chunk])
-        url = f"{OSRM_API_URL}{coords_str}?overview=full&geometries=geojson&tidy=true"
-        try:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get("matchings") and len(data["matchings"]) > 0:
-                        matched_chunk = data["matchings"][0]["geometry"]["coordinates"]
-                        
-                        # Check for unreasonable jumps in the matched route
-                        if FileHandler._check_for_jumps(chunk, matched_chunk):
-                            logger.warning("Detected unreasonable jump in matched route. Using original coordinates.")
+        async def fetch_matching(session, chunk):
+            coords_str = ";".join([f"{lon},{lat}" for lon, lat in chunk])
+            url = f"{OSRM_API_URL}{coords_str}?overview=full&geometries=geojson&tidy=true&gaps=split"
+            try:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("matchings") and len(data["matchings"]) > 0:
+                            matched_chunk = data["matchings"][0]["geometry"]["coordinates"]
+                            logger.debug(f"Original chunk: {chunk}")
+                            logger.debug(f"Matched chunk: {matched_chunk}")
+                            
+                            if FileHandler._check_for_jumps(chunk, matched_chunk):
+                                logger.warning("Detected unreasonable jump in matched route. Using hybrid approach.")
+                                return FileHandler._hybrid_match(chunk, matched_chunk)
+                            
+                            logger.info(f"Successfully map matched chunk of {len(chunk)} coordinates")
+                            return matched_chunk
+                        else:
+                            logger.warning(f"No matching found for chunk of {len(chunk)} coordinates")
                             return chunk
-                        
-                        logger.info(f"Successfully map matched chunk of {len(chunk)} coordinates")
-                        return matched_chunk
                     else:
-                        logger.warning(f"No matching found for chunk of {len(chunk)} coordinates")
-                        return chunk  # Return original if no match found
-                else:
-                    response_text = await response.text()
-                    logger.error(f"Error in map matching API call: {response.status}, Response: {response_text}")
-                    return chunk  # Return original on error
-        except Exception as e:
-            logger.error(f"Error during map matching: {str(e)}")
-            return chunk  # Return original on exception
+                        logger.error(f"Error in map matching API call: {response.status}")
+                        return chunk
+            except Exception as e:
+                logger.error(f"Error during map matching: {str(e)}")
+                return chunk
 
-    # Use a client session to make parallel requests
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for chunk in coord_chunks:
-            tasks.append(fetch_matching(session, chunk))
-            await asyncio.sleep(REQUEST_RATE_LIMIT)  # Rate limiting to avoid hitting API limits
-        results = await asyncio.gather(*tasks)
+        async with aiohttp.ClientSession() as session:
+            tasks = [fetch_matching(session, chunk) for chunk in coord_chunks]
+            results = await asyncio.gather(*tasks)
 
-    # Combine the matched coordinates
-    for result in results:
-        matched_coords.extend(result)
+        for result in results:
+            matched_coords.extend(result)
 
-    # Perform a final check on the entire matched route
-    if FileHandler._check_for_jumps(coordinates, matched_coords):
-        logger.warning("Detected unreasonable jump in final matched route. Using original coordinates.")
-        matched_coords = coordinates
+        feature["geometry"]["coordinates"] = matched_coords
+        return feature
 
-    feature["geometry"]["coordinates"] = matched_coords
-    return feature
+    @staticmethod
+    def _check_for_jumps(original_coords, matched_coords):
+        """
+        Check for unreasonable jumps in the matched coordinates.
+        
+        Args:
+            original_coords (list): Original coordinates.
+            matched_coords (list): Matched coordinates.
+        
+        Returns:
+            bool: True if an unreasonable jump is detected, False otherwise.
+        """
+        if len(original_coords) != len(matched_coords):
+            return True  # Mismatch in number of coordinates
 
-@staticmethod
-def _check_for_jumps(original_coords, matched_coords):
-    """
-    Check for unreasonable jumps in the matched coordinates.
-    
-    Args:
-        original_coords (list): Original coordinates.
-        matched_coords (list): Matched coordinates.
-    
-    Returns:
-        bool: True if an unreasonable jump is detected, False otherwise.
-    """
-    if len(original_coords) != len(matched_coords):
-        return True  # Mismatch in number of coordinates
+        max_distance = 0.5 # Increased from 0.01 to 0.05 (roughly 5km)
+        for (lon1, lat1), (lon2, lat2) in zip(original_coords, matched_coords):
+            if abs(lon1 - lon2) > max_distance or abs(lat1 - lat2) > max_distance:
+                return True  # Detected a jump larger than the threshold
+        
+        return False  # No unreasonable jumps detected
 
-    max_distance = 0.01  # Maximum allowed distance in degrees (roughly 1km)
-    for (lon1, lat1), (lon2, lat2) in zip(original_coords, matched_coords):
-        if abs(lon1 - lon2) > max_distance or abs(lat1 - lat2) > max_distance:
-            return True  # Detected a jump larger than the threshold
-    
-    return False  # No unreasonable jumps detected
+    @staticmethod
+    def _hybrid_match(original_coords, matched_coords):
+        hybrid_coords = []
+        max_distance = 0.05  # Adjust this threshold as needed
+        for orig, matched in zip(original_coords, matched_coords):
+            if abs(orig[0] - matched[0]) + abs(orig[1] - matched[1]) > max_distance:
+                hybrid_coords.append(orig)
+            else:
+                hybrid_coords.append(matched)
+        return hybrid_coords
+
     @staticmethod
     async def _write_updated_monthly_files(monthly_data, months_to_update):
         """

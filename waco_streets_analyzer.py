@@ -5,6 +5,7 @@ import pickle
 import aiofiles
 import geopandas as gpd
 from shapely.geometry import LineString
+import json
 
 gpd.options.use_pygeos = True
 
@@ -13,6 +14,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
 
 class WacoStreetsAnalyzer:
     def __init__(self, streets_geojson_path):
@@ -33,7 +35,8 @@ class WacoStreetsAnalyzer:
                 raise ValueError("streets_gdf is None or empty after load_data")
             self.sindex = self.segments_gdf.sindex
             logger.info(
-                "WacoStreetsAnalyzer initialized. Total streets: %s, Total segments: %s",
+                "WacoStreetsAnalyzer initialized. Total streets: %s, "
+                "Total segments: %s",
                 len(self.streets_gdf), len(self.segments_gdf)
             )
         except Exception as e:
@@ -53,7 +56,7 @@ class WacoStreetsAnalyzer:
     async def _load_from_cache(self):
         try:
             async with aiofiles.open(self.cache_file, "rb") as f:
-                cache_data = pickle.loads(await f.read())
+                cache_data = json.loads(await f.read())
             self.streets_gdf = cache_data["streets_gdf"]
             self.segments_gdf = cache_data["segments_gdf"]
             self.traveled_segments = cache_data["traveled_segments"]
@@ -88,7 +91,8 @@ class WacoStreetsAnalyzer:
             self.segments_gdf = self._create_segments()
             await self._save_to_cache()
             logger.info(
-                "Processed and cached street data. Total streets: %d, Total segments: %d",
+                "Processed and cached street data. Total streets: %d, "
+                "Total segments: %d",
                 len(self.streets_gdf), len(self.segments_gdf)
             )
         except Exception as e:
@@ -97,6 +101,7 @@ class WacoStreetsAnalyzer:
 
     def _create_segments(self):
         segments = []
+        # skipcq: PYL-W0612
         for idx, row in self.streets_gdf.iterrows():
             if isinstance(row.geometry, LineString):
                 coords = list(row.geometry.coords)
@@ -135,7 +140,10 @@ class WacoStreetsAnalyzer:
             return
         valid_features = [
             feature for feature in routes
-            if feature["geometry"]["type"] == "LineString" and len(feature["geometry"]["coordinates"]) > 1
+            if (
+                feature["geometry"]["type"] == "LineString" and
+                len(feature["geometry"]["coordinates"]) > 1
+            )
         ]
         if not valid_features:
             logger.warning("No valid features to process")
@@ -150,15 +158,28 @@ class WacoStreetsAnalyzer:
                 gdf.set_crs(epsg=4326, inplace=True)
 
                 # Perform spatial join instead of iterating
-                joined = gpd.sjoin(gdf, self.segments_gdf, how="inner", predicate="intersects")
+                joined = gpd.sjoin(
+                    gdf,
+                    self.segments_gdf,
+                    how="inner",
+                    predicate="intersects"
+                )
 
                 # Fix: Correctly reference the geometry for distance calculation
-                close_segments = joined[joined.apply(lambda row: row.geometry.distance(self.segments_gdf.loc[row.index_right].geometry) <= self.snap_distance, axis=1)]
+                close_segments = joined[joined.apply(
+                    lambda row: row.geometry.distance(
+                        self.segments_gdf.loc[row.index_right].geometry
+                    ) <= self.snap_distance,
+                    axis=1
+                )]
 
                 # Update traveled_segments
                 self.traveled_segments.update(close_segments['segment_id'].tolist())
 
-                logger.info("Batch processed. Total traveled segments: %s", len(self.traveled_segments))
+                logger.info(
+                    "Batch processed. Total traveled segments: %s",
+                    len(self.traveled_segments)
+                )
 
             logger.info("Progress update completed.")
         except Exception as e:

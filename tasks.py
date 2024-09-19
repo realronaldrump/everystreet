@@ -47,8 +47,9 @@ async def poll_bouncie_api(app, bouncie_api):
 
             await asyncio.sleep(1)
         except Exception as e:
-            logger.error(f"Error fetching live data: {e}", exc_info=True)
+            logger.error("Error fetching live data: %s", e, exc_info=True)
             await asyncio.sleep(5)
+
 
 async def load_historical_data_background(app, geojson_handler):
     async with app.historical_data_lock:
@@ -60,7 +61,7 @@ async def load_historical_data_background(app, geojson_handler):
             app.historical_data_loaded = True
         logger.info("Historical data loaded successfully")
     except Exception as e:
-        logger.error(f"Error loading historical data: {str(e)}", exc_info=True)
+        logger.error("Error loading historical data: %s", str(e), exc_info=True)
     finally:
         async with app.historical_data_lock:
             app.historical_data_loading = False

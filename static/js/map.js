@@ -25,7 +25,6 @@ let liveDataSocket = null;
 // Global variables
 let map = null;
 let wacoLimitsLayer = null;
-let progressLayer = null;
 let historicalDataLayer = null;
 let liveRoutePolyline = null;
 let liveMarker = null;
@@ -59,7 +58,7 @@ async function clearAllBrowserStorage() {
       const cookie = cookies[i];
       const eqPos = cookie.indexOf("=");
       const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
-      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
   }
 
   // Clear cache storage
@@ -159,7 +158,7 @@ async function fetchInitialLiveRouteData() {
       throw new Error(`Failed to fetch initial live route data: ${response.status}`);
     }
     const initialData = await response.json();
-    if (initialData && initialData.features && initialData.features.length > 0) {
+    if (initialData?.features?.length > 0) {
       updateLiveRouteOnMap(initialData);
       // Store the last position
       const coordinates = initialData?.features?.[0]?.geometry?.coordinates;
@@ -1204,11 +1203,11 @@ async function displayHistoricalData(fitBounds = false) {
 }
 function waitForMap() {
   return new Promise((resolve) => {
-    if (map && map.initialized) {
+    if (map?.initialized) {
       resolve();
     } else {
       const checkInterval = setInterval(() => {
-        if (map && map.initialized) {
+        if (map?.initialized) {
           clearInterval(checkInterval);
           resolve();
         }
@@ -1220,17 +1219,17 @@ function waitForMap() {
 // Disable filter controls
 function disableFilterControls() {
   ['#time-filters button', '#applyFilterBtn', '#filterWaco', '#startDate', '#endDate', '#wacoBoundarySelect', '#updateDataBtn']
-    .forEach(selector => {
-      document.querySelectorAll(selector).forEach(el => el.disabled = true);
-    });
+      .forEach(selector => {
+        document.querySelectorAll(selector).forEach(el => { el.disabled = true; });
+      });
 }
 
 // Enable filter controls
 function enableFilterControls() {
   ['#time-filters button', '#applyFilterBtn', '#filterWaco', '#startDate', '#endDate', '#wacoBoundarySelect', '#updateDataBtn']
-    .forEach(selector => {
-      document.querySelectorAll(selector).forEach(el => el.disabled = false);
-    });
+      .forEach(selector => {
+        document.querySelectorAll(selector).forEach(el => { el.disabled = false; });
+      });
 }
 // Update the visibility of the historical data layer based on checkbox state
 function updateHistoricalDataLayerVisibility() {
@@ -1323,7 +1322,7 @@ function setupEventListeners() {
           throw new Error(data.error);
         }
       } catch (error) {
-        throw new Error('Error updating historical data: ' + error.message);
+        throw new Error(`Error updating historical data: ${error.message}`);
       }
     }, 'Checking for new driving data...'));
   }
@@ -1379,7 +1378,7 @@ function setupEventListeners() {
           setTimeout(() => removeLayer(searchMarker), 10000);
         }
       } catch (error) {
-        throw new Error('Error searching for location: ' + error.message);
+        throw new Error(`Error searching for location: ${error.message}`);
       }
     }, 'Searching for location...'));
 
@@ -1457,7 +1456,7 @@ function setupEventListeners() {
           throw new Error(data.error);
         }
       } catch (error) {
-        throw new Error('Error resetting progress: ' + error.message);
+        throw new Error(`Error resetting progress: ${error.message}`);
       }
     }, 'Resetting progress...'));
 

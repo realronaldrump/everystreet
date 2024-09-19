@@ -6,6 +6,7 @@ import aiofiles
 import geopandas as gpd
 from shapely.geometry import LineString
 import json
+import numpy as np
 
 gpd.options.use_pygeos = True
 
@@ -56,10 +57,15 @@ class WacoStreetsAnalyzer:
     async def _load_from_cache(self):
         try:
             async with aiofiles.open(self.cache_file, "rb") as f:
-                cache_data = json.loads(await f.read())
-            self.streets_gdf = cache_data["streets_gdf"]
-            self.segments_gdf = cache_data["segments_gdf"]
-            self.traveled_segments = cache_data["traveled_segments"]
+                cache_data = await f.read()
+            
+            decoded_data = cache_data.decode('utf-8')
+            parsed_data = json.loads(decoded_data)
+            
+            self.streets_gdf = gpd.GeoDataFrame.from_features(parsed_data["streets_gdf"])
+            self.segments_gdf = gpd.GeoDataFrame.from_features(parsed_data["segments_gdf"])
+            self.traveled_segments = set(parsed_data["traveled_segments"])
+            
             if (
                 self.streets_gdf is None or self.streets_gdf.empty or
                 self.segments_gdf is None or self.segments_gdf.empty
@@ -101,7 +107,6 @@ class WacoStreetsAnalyzer:
 
     def _create_segments(self):
         segments = []
-        # skipcq: PYL-W0612
         for idx, row in self.streets_gdf.iterrows():
             if isinstance(row.geometry, LineString):
                 coords = list(row.geometry.coords)
@@ -118,15 +123,13 @@ class WacoStreetsAnalyzer:
 
     async def _save_to_cache(self):
         try:
-            cache_data = pickle.dumps(
-                {
-                    "streets_gdf": self.streets_gdf,
-                    "segments_gdf": self.segments_gdf,
-                    "traveled_segments": self.traveled_segments,
-                }
-            )
-            async with aiofiles.open(self.cache_file, "wb") as f:
-                await f.write(cache_data)
+            cache_data = {
+                "streets_gdf": json.loads(self.streets_gdf.to_json()),
+                "segments_gdf": json.loads(self.segments_gdf.to_json()),
+                "traveled_segments": list(self.traveled_segments),
+            }
+            async with aiofiles.open(self.cache_file, "w") as f:
+                await json.dump(cache_data, f)
         except Exception as e:
             logger.error("Error saving to cache: %s", str(e))
 
@@ -165,9 +168,10 @@ class WacoStreetsAnalyzer:
                     predicate="intersects"
                 )
 
-                # Fix: Correctly reference the geometry for distance calculation
+                # Use the new calculate_distance method
                 close_segments = joined[joined.apply(
-                    lambda row: row.geometry.distance(
+                    lambda row: self.calculate_distance(
+                        row.geometry,
                         self.segments_gdf.loc[row.index_right].geometry
                     ) <= self.snap_distance,
                     axis=1
@@ -184,6 +188,29 @@ class WacoStreetsAnalyzer:
             logger.info("Progress update completed.")
         except Exception as e:
             logger.error("Error processing routes: %s", str(e), exc_info=True)
+
+    def calculate_distance(self, geom1, geom2):
+        try:
+            # Convert to LineString if not already
+            if not isinstance(geom1, LineString):
+                geom1 = LineString(geom1)
+            if not isinstance(geom2, LineString):
+                geom2 = LineString(geom2)
+
+            # Check for valid geometries
+            if not geom1.is_valid or not geom2.is_valid:
+                return np.inf  # Return infinity for invalid geometries
+
+            distance = geom1.distance(geom2)
+            
+            # Check for NaN or infinity
+            if np.isnan(distance) or np.isinf(distance):
+                return np.inf
+
+            return distance
+        except Exception as e:
+            logger.error(f"Error calculating distance: {str(e)}")
+            return np.inf
 
     def calculate_progress(self):
         logger.info("Calculating progress...")

@@ -276,5 +276,5 @@ class DataProcessor:
             logger.info(f"Streets after filtering: {len(street_network)}")
             return street_network.to_json()
         except Exception as e:
-            logger.error(f"Error in get_waco_streets: {str(e)}", exc_info=True)
+            logger.error(f"Error in get_waco_streets: {str(e)}, exc_info=True")
             return json.dumps({"error": str(e)})

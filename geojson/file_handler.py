@@ -5,15 +5,19 @@ import asyncio
 from datetime import datetime, timezone
 import aiofiles
 from dateutil import parser
-import numpy as np
+import aiohttp
+import time
 
 # Set up logger
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
 FEATURE_COLLECTION_TYPE = "FeatureCollection"
 EPSG_4326 = "EPSG:4326"
-
+OSRM_API_URL = "http://router.project-osrm.org/match/v1/driving/"
+MAX_COORDINATES_PER_REQUEST = 100  # OSRM typically limits to 100 coordinates per request
+REQUEST_RATE_LIMIT = 1  # One request per second
 
 class FileHandler:
     """
@@ -24,7 +28,7 @@ class FileHandler:
     async def update_monthly_files(handler, new_features):
         """
         Updates the monthly data with new features, handling duplicates based on
-        timestamps.
+        timestamps and performing map matching.
 
         Args:
             handler: The GeoJSONHandler instance containing monthly data.
@@ -34,9 +38,6 @@ class FileHandler:
         months_to_update = set()
 
         for feature in new_features:
-            feature["geometry"]["coordinates"] = FileHandler._convert_ndarray_to_list(
-                feature["geometry"]["coordinates"]
-            )
             timestamp = FileHandler._parse_timestamp(
                 feature["properties"].get("timestamp")
             )
@@ -51,10 +52,11 @@ class FileHandler:
                 handler.monthly_data[month_year] = []
 
             if not any(
-                f["properties"]["timestamp"] == timestamp
+                f["properties"]["timestamp"] == feature["properties"]["timestamp"]
                 for f in handler.monthly_data[month_year]
             ):
-                handler.monthly_data[month_year].append(feature)
+                matched_feature = await FileHandler._map_match_feature(feature)
+                handler.monthly_data[month_year].append(matched_feature)
                 months_to_update.add(month_year)
 
         if months_to_update:
@@ -65,6 +67,97 @@ class FileHandler:
                 "Updated monthly files for %d months", len(months_to_update)
             )
 
+@staticmethod
+async def _map_match_feature(feature):
+    """
+    Performs map matching on a single feature using the OSRM API.
+
+    Args:
+        feature (dict): A GeoJSON feature to be map matched.
+
+    Returns:
+        dict: The map matched GeoJSON feature.
+    """
+    coordinates = feature["geometry"]["coordinates"]
+
+    # Split coordinates into chunks of MAX_COORDINATES_PER_REQUEST
+    coord_chunks = [coordinates[i:i + MAX_COORDINATES_PER_REQUEST]
+                    for i in range(0, len(coordinates), MAX_COORDINATES_PER_REQUEST)]
+
+    matched_coords = []
+
+    async def fetch_matching(session, chunk):
+        """
+        Fetch the map-matching result for a chunk of coordinates.
+        """
+        coords_str = ";".join([f"{lon},{lat}" for lon, lat in chunk])
+        url = f"{OSRM_API_URL}{coords_str}?overview=full&geometries=geojson&tidy=true"
+        try:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("matchings") and len(data["matchings"]) > 0:
+                        matched_chunk = data["matchings"][0]["geometry"]["coordinates"]
+                        
+                        # Check for unreasonable jumps in the matched route
+                        if FileHandler._check_for_jumps(chunk, matched_chunk):
+                            logger.warning("Detected unreasonable jump in matched route. Using original coordinates.")
+                            return chunk
+                        
+                        logger.info(f"Successfully map matched chunk of {len(chunk)} coordinates")
+                        return matched_chunk
+                    else:
+                        logger.warning(f"No matching found for chunk of {len(chunk)} coordinates")
+                        return chunk  # Return original if no match found
+                else:
+                    response_text = await response.text()
+                    logger.error(f"Error in map matching API call: {response.status}, Response: {response_text}")
+                    return chunk  # Return original on error
+        except Exception as e:
+            logger.error(f"Error during map matching: {str(e)}")
+            return chunk  # Return original on exception
+
+    # Use a client session to make parallel requests
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for chunk in coord_chunks:
+            tasks.append(fetch_matching(session, chunk))
+            await asyncio.sleep(REQUEST_RATE_LIMIT)  # Rate limiting to avoid hitting API limits
+        results = await asyncio.gather(*tasks)
+
+    # Combine the matched coordinates
+    for result in results:
+        matched_coords.extend(result)
+
+    # Perform a final check on the entire matched route
+    if FileHandler._check_for_jumps(coordinates, matched_coords):
+        logger.warning("Detected unreasonable jump in final matched route. Using original coordinates.")
+        matched_coords = coordinates
+
+    feature["geometry"]["coordinates"] = matched_coords
+    return feature
+
+@staticmethod
+def _check_for_jumps(original_coords, matched_coords):
+    """
+    Check for unreasonable jumps in the matched coordinates.
+    
+    Args:
+        original_coords (list): Original coordinates.
+        matched_coords (list): Matched coordinates.
+    
+    Returns:
+        bool: True if an unreasonable jump is detected, False otherwise.
+    """
+    if len(original_coords) != len(matched_coords):
+        return True  # Mismatch in number of coordinates
+
+    max_distance = 0.01  # Maximum allowed distance in degrees (roughly 1km)
+    for (lon1, lat1), (lon2, lat2) in zip(original_coords, matched_coords):
+        if abs(lon1 - lon2) > max_distance or abs(lat1 - lat2) > max_distance:
+            return True  # Detected a jump larger than the threshold
+    
+    return False  # No unreasonable jumps detected
     @staticmethod
     async def _write_updated_monthly_files(monthly_data, months_to_update):
         """
@@ -147,24 +240,6 @@ class FileHandler:
                 "features": features,
             }
             await f.write(json.dumps(geojson_data, indent=4))
-
-    @staticmethod
-    def _convert_ndarray_to_list(obj):
-        """
-        Recursively converts numpy arrays to Python lists.
-
-        Args:
-            obj (object): The object that may contain numpy arrays.
-
-        Returns:
-            object: A Python list if input was a numpy array, otherwise the object
-            itself.
-        """
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, list):
-            return [FileHandler._convert_ndarray_to_list(item) for item in obj]
-        return obj
 
     @staticmethod
     def _merge_features(existing_features, new_features):

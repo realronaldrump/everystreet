@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from shapely.geometry import shape, Point
 import shapely.geometry
 
 from .data_loader import DataLoader

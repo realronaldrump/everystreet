@@ -3,7 +3,6 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from shapely.geometry import shape, Point
 
 
 import aiofiles

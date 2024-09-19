@@ -8,11 +8,11 @@ from time import time
 
 
 from cachetools import TTLCache
-from quart import (Response, jsonify, redirect, render_template, request,
+from quart import (jsonify, redirect, render_template, request,
                    session, url_for, websocket, make_response)
 
 from config import Config
-from date_utils import format_date, timedelta
+from date_utils import timedelta
 from models import DateRange, HistoricalDataParams
 from tasks import load_historical_data_background, poll_bouncie_api
 from utils import geolocator, login_required

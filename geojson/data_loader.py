@@ -33,7 +33,7 @@ class DataLoader:
                     ) as pbar:
                         for file in monthly_files:
                             month_features, month_year = await self._process_file(file, handler.fetched_trip_timestamps)
-                            
+
                             handler.historical_geojson_features.extend(month_features)
                             handler.monthly_data[month_year] = month_features
                             total_features += len(month_features)

@@ -151,10 +151,10 @@ class WacoStreetsAnalyzer:
 
                 # Perform spatial join instead of iterating
                 joined = gpd.sjoin(gdf, self.segments_gdf, how="inner", predicate="intersects")
-                
+
                 # Fix: Correctly reference the geometry for distance calculation
                 close_segments = joined[joined.apply(lambda row: row.geometry.distance(self.segments_gdf.loc[row.index_right].geometry) <= self.snap_distance, axis=1)]
-                
+
                 # Update traveled_segments
                 self.traveled_segments.update(close_segments['segment_id'].tolist())
 

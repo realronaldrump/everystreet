@@ -44,7 +44,7 @@ async def poll_bouncie_api(app, bouncie_api):
                         logger.debug(
                             "Duplicate point detected, not adding to live route"
                         )
-            
+
             await asyncio.sleep(1)
         except Exception as e:
             logger.error(f"Error fetching live data: {e}", exc_info=True)

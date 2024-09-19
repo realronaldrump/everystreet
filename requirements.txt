@@ -17,3 +17,5 @@ Shapely==2.0.6
 tqdm==4.66.5
 redis
 polyline
+fiona>=1.10b2 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

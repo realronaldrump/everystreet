@@ -171,6 +171,25 @@ async function fetchInitialLiveRouteData() {
   }
 }
 
+// Custom marker icons
+const BLUE_BLINKING_MARKER_ICON = L.divIcon({
+  className: 'blinking-marker',
+  iconSize: [20, 20],
+  html: '<div style="background-color: blue; width: 100%; height: 100%; border-radius: 50%;"></div>'
+});
+
+const RED_BLINKING_MARKER_ICON = L.divIcon({
+  className: 'blinking-marker animate__animated animate__bounce',
+  iconSize: [20, 20],
+  html: '<div style="background-color: red; width: 100%; height: 100%; border-radius: 50%;"></div>'
+});
+
+const RED_MARKER_ICON = L.divIcon({
+  className: 'custom-marker animate__animated animate__bounceInDown',
+  iconSize: [30, 30],
+  html: '<div style="background-color: red; width: 100%; height: 100%; border-radius: 50%;"></div>'
+});
+
 function updateLiveRouteOnMap(liveData) {
   if (!liveData || !liveData.features || liveData.features.length === 0) {
     console.warn('Received invalid live data');
@@ -230,43 +249,25 @@ function updateLiveRouteOnMap(liveData) {
   }
 }
 
-function updateMetrics(metrics) {
-  if (!metrics) {
-    return;
-  }
+// Comment out the unused function 'updateMetrics'
+// function updateMetrics(metrics) {
+//   if (!metrics) {
+//     return;
+//   }
 
-  const updateElement = (id, value, unit = '') => {
-    const element = document.getElementById(id);
-    if (element && value !== undefined) {
-      element.textContent = `${value}${unit}`;
-    }
-  };
+//   const updateElement = (id, value, unit = '') => {
+//     const element = document.getElementById(id);
+//     if (element && value !== undefined) {
+//       element.textContent = `${value}${unit}`;
+//     }
+//   };
 
-  updateElement('totalDistance', metrics.total_distance?.toFixed(2), ' miles');
-  updateElement('totalTime', metrics.total_time);
-  updateElement('maxSpeed', metrics.max_speed?.toFixed(2), ' mph');
-  updateElement('startTime', new Date(metrics.start_time).toLocaleString());
-  updateElement('endTime', new Date(metrics.end_time).toLocaleString());
-}
-
-// Custom marker icons
-const BLUE_BLINKING_MARKER_ICON = L.divIcon({
-  className: 'blinking-marker',
-  iconSize: [20, 20],
-  html: '<div style="background-color: blue; width: 100%; height: 100%; border-radius: 50%;"></div>'
-});
-
-const RED_BLINKING_MARKER_ICON = L.divIcon({
-  className: 'blinking-marker animate__animated animate__bounce',
-  iconSize: [20, 20],
-  html: '<div style="background-color: red; width: 100%; height: 100%; border-radius: 50%;"></div>'
-});
-
-const RED_MARKER_ICON = L.divIcon({
-  className: 'custom-marker animate__animated animate__bounceInDown',
-  iconSize: [30, 30],
-  html: '<div style="background-color: red; width: 100%; height: 100%; border-radius: 50%;"></div>'
-});
+//   updateElement('totalDistance', metrics.total_distance?.toFixed(2), ' miles');
+//   updateElement('totalTime', metrics.total_time);
+//   updateElement('maxSpeed', metrics.max_speed?.toFixed(2), ' mph');
+//   updateElement('startTime', new Date(metrics.start_time).toLocaleString());
+//   updateElement('endTime', new Date(metrics.end_time).toLocaleString());
+// }
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
@@ -391,7 +392,7 @@ function initMap() {
       progressControl.addTo(map);
 
       if (wacoOnlyMode) {
-        map.on('drag', function() {
+        map.on('drag', () => {
           map.panInsideBounds(MCLENNAN_COUNTY_BOUNDS, { animate: false });
         });
       }
@@ -852,7 +853,7 @@ async function loadWacoStreets() {
       },
       pane: 'wacoStreetsPane',
       onEachFeature: (feature, layer) => {
-        if (feature.properties && feature.properties.name) {
+        if (feature.properties?.name) {
           layer.bindPopup(feature.properties.name);
         }
 
@@ -992,7 +993,7 @@ function stopPlayback() {
 // Adjust route playback speed
 function adjustPlaybackSpeed() {
   playbackSpeed = parseFloat(document.getElementById('playbackSpeed').value);
-  document.getElementById('speedValue').textContent = playbackSpeed.toFixed(1) + 'x';
+  document.getElementById('speedValue').textContent = `${playbackSpeed.toFixed(1)}x`;
   if (playbackAnimation) {
     clearInterval(playbackAnimation);
     startPlayback(playbackPolyline.getLatLngs());
@@ -1174,7 +1175,7 @@ async function displayHistoricalData(fitBounds = false) {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const data = await fetchHistoricalData();
     
-    if (data && data.features) {
+    if (data?.features) {
       updateMapWithHistoricalData(data, fitBounds);
     } else {
       showFeedback('No historical data available for the selected period.', 'info');

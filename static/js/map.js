@@ -533,7 +533,7 @@ async function initWacoStreetsLayer() {
       },
       pane: 'wacoStreetsPane',
       onEachFeature: (feature, layer) => {
-        if (feature.properties && feature.properties.name) {
+        if (feature.properties?.name) {
           layer.bindPopup(feature.properties.name);
         }
 

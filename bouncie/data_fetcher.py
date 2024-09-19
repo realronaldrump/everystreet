@@ -17,7 +17,12 @@ class DataFetcher:
     async def fetch_summary_data(self, session, date):
         start_time = f"{date}T00:00:00-05:00"
         end_time = f"{date}T23:59:59-05:00"
-        summary_url = f"https://www.bouncie.app/api/vehicles/{self.client.vehicle_id}/triplegs/details/summary?bands=true&defaultColor=%2355AEE9&overspeedColor=%23CC0000&startDate={start_time}&endDate={end_time}"
+        summary_url = (
+            "https://www.bouncie.app/api/vehicles/"
+            f"{self.client.vehicle_id}/triplegs/details/summary?"
+            "bands=true&defaultColor=%2355AEE9&overspeedColor=%23CC0000&"
+            f"startDate={start_time}&endDate={end_time}"
+        )
 
         headers = {
             "Accept": "application/json",
@@ -30,7 +35,8 @@ class DataFetcher:
                 return await response.json()
             else:
                 logger.error(
-                    f"Error: Failed to fetch data for {date}. HTTP Status code: {response.status}"
+                    "Error: Failed to fetch data for %s. HTTP Status code: %s",
+                    date, response.status
                 )
                 return None
 
@@ -74,9 +80,9 @@ class DataFetcher:
 
             bouncie_status = stats.get("battery", {}).get("status", "unknown")
             battery_state = (
-                "full" if bouncie_status == "normal"
-                else "unplugged" if bouncie_status == "low"
-                else "unknown"
+                "full" if bouncie_status == "normal" else
+                "unplugged" if bouncie_status == "low" else
+                "unknown"
             )
 
             last_updated = stats.get("lastUpdated")
@@ -89,7 +95,9 @@ class DataFetcher:
             elif isinstance(last_updated, (int, float)):
                 timestamp = int(last_updated)
             else:
-                logger.error(f"Unexpected lastUpdated format: {last_updated}")
+                logger.error(
+                    "Unexpected lastUpdated format: %s", last_updated
+                )
                 return None
 
             return {
@@ -102,5 +110,5 @@ class DataFetcher:
                 "address": location_address,
             }
         except Exception as e:
-            logger.error(f"Error processing vehicle data: {e}")
+            logger.error("Error processing vehicle data: %s", e)
             return None

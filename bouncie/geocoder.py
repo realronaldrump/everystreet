@@ -27,7 +27,7 @@ class Geocoder:
                 return "N/A"
             except Exception as e:
                 logger.error(
-                    f"Reverse geocoding attempt {attempt + 1} failed with error: {e}"
+                    "Reverse geocoding attempt %d failed with error: %s", attempt + 1, e
                 )
                 if attempt < retries - 1:
                     await asyncio.sleep(1)

@@ -17,7 +17,7 @@ FEATURE_COLLECTION_TYPE = "FeatureCollection"
 EPSG_4326 = "EPSG:4326"
 OSRM_API_URL = "http://router.project-osrm.org/match/v1/driving/"
 MAX_COORDINATES_PER_REQUEST = 100
-REQUEST_RATE_LIMIT = 1  # One request per second
+REQUEST_RATE_LIMIT = 10  # One request per second
 
 class FileHandler:
     """
@@ -127,7 +127,7 @@ class FileHandler:
         if len(original_coords) != len(matched_coords):
             return True  # Mismatch in number of coordinates
 
-        max_distance = 0.5 # Increased from 0.01 to 0.05 (roughly 5km)
+        max_distance = 0.005 # Increased from 0.01 to 0.05 (roughly 5km)
         for (lon1, lat1), (lon2, lat2) in zip(original_coords, matched_coords):
             if abs(lon1 - lon2) > max_distance or abs(lat1 - lat2) > max_distance:
                 return True  # Detected a jump larger than the threshold
@@ -137,7 +137,7 @@ class FileHandler:
     @staticmethod
     def _hybrid_match(original_coords, matched_coords):
         hybrid_coords = []
-        max_distance = 0.05  # Adjust this threshold as needed
+        max_distance = 0.03  # Adjust this threshold as needed
         for orig, matched in zip(original_coords, matched_coords):
             if abs(orig[0] - matched[0]) + abs(orig[1] - matched[1]) > max_distance:
                 hybrid_coords.append(orig)

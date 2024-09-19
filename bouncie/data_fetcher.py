@@ -33,12 +33,11 @@ class DataFetcher:
         async with session.get(summary_url, headers=headers) as response:
             if response.status == 200:
                 return await response.json()
-            else:
-                logger.error(
-                    "Error: Failed to fetch data for %s. HTTP Status code: %s",
-                    date, response.status
-                )
-                return None
+            logger.error(
+                "Error: Failed to fetch data for %s. HTTP Status code: %s",
+                date, response.status
+            )
+            return None
 
     async def fetch_trip_data(self, start_date, end_date):
         if not await self.client.get_access_token():

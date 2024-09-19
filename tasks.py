@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
 
 from utils import save_live_route_data
 

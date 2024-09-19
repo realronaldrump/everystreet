@@ -1,5 +1,4 @@
 import logging
-import os
 
 from bounciepy import AsyncRESTAPIClient
 

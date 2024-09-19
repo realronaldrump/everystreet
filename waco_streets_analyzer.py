@@ -1,13 +1,10 @@
 import asyncio
 import logging
 import os
-import rtree
 import pickle
 import aiofiles
 import geopandas as gpd
-from rtree import index
 from shapely.geometry import LineString
-import shapely.vectorized
 
 gpd.options.use_pygeos = True
 

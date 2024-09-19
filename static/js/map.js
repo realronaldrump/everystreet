@@ -134,6 +134,7 @@ function setupWebSocketConnections() {
     }
   });
 
+
   // Fetch initial live route data
   fetchInitialLiveRouteData();
 }

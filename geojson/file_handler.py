@@ -21,13 +21,13 @@ class FileHandler:
     """
 
     @staticmethod
-    async def update_monthly_files(monthly_data, new_features):
+    async def update_monthly_files(handler, new_features):
         """
         Updates the monthly data with new features, handling duplicates based on
         timestamps.
 
         Args:
-            monthly_data (dict): Dictionary containing existing monthly data.
+            handler: The GeoJSONHandler instance containing monthly data.
             new_features (list): List of new features to be added.
         """
         logger.info("Starting update with %d new features", len(new_features))
@@ -47,19 +47,19 @@ class FileHandler:
                 "%Y-%m"
             )
 
-            if month_year not in monthly_data:
-                monthly_data[month_year] = []
+            if month_year not in handler.monthly_data:
+                handler.monthly_data[month_year] = []
 
             if not any(
                 f["properties"]["timestamp"] == timestamp
-                for f in monthly_data[month_year]
+                for f in handler.monthly_data[month_year]
             ):
-                monthly_data[month_year].append(feature)
+                handler.monthly_data[month_year].append(feature)
                 months_to_update.add(month_year)
 
         if months_to_update:
             await FileHandler._write_updated_monthly_files(
-                monthly_data, months_to_update
+                handler.monthly_data, months_to_update
             )
             logger.info(
                 "Updated monthly files for %d months", len(months_to_update)

@@ -127,7 +127,7 @@ class FileHandler:
         if len(original_coords) != len(matched_coords):
             return True  # Mismatch in number of coordinates
 
-        max_distance = 0.005 # Increased from 0.01 to 0.05 (roughly 5km)
+        max_distance = 0.005 A # Increased from 0.01 to 0.05 (roughly 5km)
         for (lon1, lat1), (lon2, lat2) in zip(original_coords, matched_coords):
             if abs(lon1 - lon2) > max_distance or abs(lat1 - lat2) > max_distance:
                 return True  # Detected a jump larger than the threshold

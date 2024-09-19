@@ -82,7 +82,7 @@ async def create_app():
         Executes before the application starts serving requests.
         Any additional startup tasks can be added here.
         """
-        pass
+        # pass
 
     @app.after_request
     async def add_header(response):

@@ -124,8 +124,9 @@ def register_routes(app):
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
             streets_filter = request.args.get("filter", "all")
             cache_key = f"waco_streets_{waco_boundary}_{streets_filter}"
-            if cache_key in cache:
-                return jsonify(cache[cache_key])
+            cached_data = redis_client.get(cache_key)
+            if cached_data:
+                return jsonify(json.loads(cached_data))
             logging.info(
                 f"Fetching Waco streets: boundary={waco_boundary}, filter={streets_filter}"
             )
@@ -135,7 +136,7 @@ def register_routes(app):
             streets_data = json.loads(streets_geojson)
             if "features" not in streets_data:
                 raise ValueError("Invalid GeoJSON: 'features' key not found")
-            cache[cache_key] = streets_data
+            redis_client.setex(cache_key, 3600, json.dumps(streets_data))
             logging.info(f"Returning {len(streets_data['features'])} street features")
             return jsonify(streets_data)
         except Exception as e:
@@ -199,7 +200,7 @@ def register_routes(app):
 
             # Wait a small amount of time before the next check, e.g., 1 second
             await asyncio.sleep(1)
-      except asyncio.CancelledError:
+    except asyncio.CancelledError:
         # Handle WebSocket disconnection
         pass
 
@@ -212,7 +213,6 @@ def register_routes(app):
                     "loading": app.historical_data_loading,
                 }
             )
-
 
     @app.websocket("/ws/trip_metrics")
     async def ws_trip_metrics():
@@ -240,7 +240,6 @@ def register_routes(app):
       except asyncio.CancelledError:
         # Handle WebSocket disconnection
         pass
-
 
     @app.route("/search_location")
     async def search_location():

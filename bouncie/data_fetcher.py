@@ -74,9 +74,9 @@ class DataFetcher:
 
             bouncie_status = stats.get("battery", {}).get("status", "unknown")
             battery_state = (
-                "full"
-                if bouncie_status == "normal"
-                else "unplugged" if bouncie_status == "low" else "unknown"
+                "full" if bouncie_status == "normal" 
+                else "unplugged" if bouncie_status == "low" 
+                else "unknown"
             )
 
             last_updated = stats.get("lastUpdated")

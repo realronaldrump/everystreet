@@ -42,6 +42,8 @@ let searchMarker = null;
 let centeringInterval = null;
 const processingQueue = [];
 let wacoOnlyMode = true;
+let isCenteringOnLiveMarker = false;
+let lastKnownPosition = null;
 
 
 async function clearAllBrowserStorage() {

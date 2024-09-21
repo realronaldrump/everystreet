@@ -56,10 +56,12 @@ class WacoStreetsAnalyzer:
     async def _load_from_cache(self):
         try:
             async with aiofiles.open(self.cache_file, "rb") as f:
-                cache_data = json.loads(await f.read())
-            self.streets_gdf = cache_data["streets_gdf"]
-            self.segments_gdf = cache_data["segments_gdf"]
-            self.traveled_segments = cache_data["traveled_segments"]
+                cache_data = await f.read()
+            cache_data = cache_data.decode('utf-8')
+            cache_dict = json.loads(cache_data)
+            self.streets_gdf = cache_dict["streets_gdf"]
+            self.segments_gdf = cache_dict["segments_gdf"]
+            self.traveled_segments = set(cache_dict["traveled_segments"])
             if (
                 self.streets_gdf is None or self.streets_gdf.empty or
                 self.segments_gdf is None or self.segments_gdf.empty

@@ -39,6 +39,8 @@ class BouncieClient:
             if not success:
                 logger.error("Failed to obtain access token.")
                 return False
+            logger.info("Successfully obtained access token.")
+            logger.debug(f"Access token: {self.client.access_token}")  # Be cautious with this in production
             return True
         except Exception as e:
             logger.error(f"Error getting access token: {e}")

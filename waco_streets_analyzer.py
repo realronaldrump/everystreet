@@ -22,7 +22,7 @@ class WacoStreetsAnalyzer:
         self.cache_file = "waco_streets_cache.pkl"
         self.streets_gdf = None
         self.segments_gdf = None
-        self.traveled_segments = set()
+        self.traveled_segments = set()  # Initialize as a set
         self.snap_distance = 0.0000001
         self.sindex = None
         self.lock = asyncio.Lock()

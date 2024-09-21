@@ -16,6 +16,7 @@ class Config(BaseSettings):
     PASSWORD: str
     SECRET_KEY: str
     FOURSQUARE_API_KEY: str
+    AUTHORIZATION: str
 
     class Config:
         env_file = ".env"

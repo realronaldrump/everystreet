@@ -26,12 +26,13 @@ class DataProcessor:
             logger.info("Starting update_and_process_data")
 
             # Step 1: Fetch all historical data
-            await self.fetch_all_historical_data(handler, fetch_all, start_date, end_date)
+            new_features = await self.fetch_all_historical_data(handler, fetch_all, start_date, end_date)
 
             # Step 2: Process routes and update Waco streets progress
-            await self.process_routes_and_update_progress(handler)
+            await self.process_routes_and_update_progress(handler, new_features)
 
             logger.info("Finished update_and_process_data")
+            return new_features
         except Exception as e:
             logger.error(
                 f"An error occurred during data update and processing: {str(e)}",
@@ -52,13 +53,11 @@ class DataProcessor:
                     logger.info(f"Fetching data starting from provided start date: {start_date}")
                 elif handler.historical_geojson_features:
                     latest_timestamp = max(
-                        feature["properties"]["timestamp"]
+                        feature["properties"]["endTime"]
                         for feature in handler.historical_geojson_features
-                        if feature["properties"].get("timestamp") is not None
+                        if feature["properties"].get("endTime") is not None
                     )
-                    start_date = datetime.fromtimestamp(
-                        latest_timestamp, tz=timezone.utc
-                    ) + timedelta(days=1)
+                    start_date = datetime.fromisoformat(latest_timestamp) + timedelta(seconds=1)
                     logger.info(
                         f"Fetching data starting from the latest timestamp: {start_date}"
                     )
@@ -95,6 +94,7 @@ class DataProcessor:
                 tasks = [fetch_data_for_date(date) for date in date_range]
                 results = await asyncio.gather(*tasks)
 
+                all_new_features = []
                 for date, trips in results:
                     if trips:
                         new_features = (
@@ -108,7 +108,7 @@ class DataProcessor:
                             unique_new_features = [
                                 feature
                                 for feature in new_features
-                                if feature["properties"]["timestamp"]
+                                if feature["properties"]["startTime"]
                                 not in handler.fetched_trip_timestamps
                             ]
 
@@ -116,11 +116,9 @@ class DataProcessor:
                                 await self.file_handler.update_monthly_files(
                                     handler, unique_new_features
                                 )
-                                handler.historical_geojson_features.extend(
-                                    unique_new_features
-                                )
+                                all_new_features.extend(unique_new_features)
                                 handler.fetched_trip_timestamps.update(
-                                    feature["properties"]["timestamp"]
+                                    feature["properties"]["startTime"]
                                     for feature in unique_new_features
                                 )
                                 logger.info(
@@ -132,6 +130,7 @@ class DataProcessor:
                         logger.info(f"No trips found for {date.strftime('%Y-%m-%d')}")
 
                 logger.info("Finished fetch_all_historical_data")
+                return all_new_features
             except Exception as e:
                 logger.error(
                     f"An error occurred during historical data fetch: {str(e)}",
@@ -139,13 +138,12 @@ class DataProcessor:
                 )
                 raise
 
-    async def process_routes_and_update_progress(self, handler):
+    async def process_routes_and_update_progress(self, handler, new_features):
         try:
             logger.info("Starting process_routes_and_update_progress")
 
-            # Process all routes
-            for feature in handler.historical_geojson_features:
-                await self.waco_analyzer.update_progress([feature])
+            # Process new routes
+            await self.waco_analyzer.update_progress(new_features)
 
             # Calculate final progress
             progress = self.waco_analyzer.calculate_progress()
@@ -188,17 +186,11 @@ class DataProcessor:
             ) - timedelta(seconds=1)
 
             if month_start <= end_datetime and month_end >= start_datetime:
-                valid_features = []
-                for feature in features:
-                    if (
-                        feature["geometry"]["type"] == "LineString"
-                        and len(feature["geometry"]["coordinates"]) > 1
-                    ):
-                        valid_features.append(feature)
-                    else:
-                        logger.warning(
-                            f"Skipping invalid feature in {month_year}: {feature}"
-                        )
+                valid_features = [
+                    feature for feature in features
+                    if feature["geometry"]["type"] == "LineString"
+                    and len(feature["geometry"]["coordinates"]) > 1
+                ]
 
                 if not valid_features:
                     logger.warning(f"No valid features found for {month_year}")
@@ -212,16 +204,16 @@ class DataProcessor:
                     )
                     continue
 
-                if "timestamp" in month_features.columns:
-                    month_features["timestamp"] = pd.to_datetime(
-                        month_features["timestamp"], utc=True
+                if "startTime" in month_features.columns:
+                    month_features["startTime"] = pd.to_datetime(
+                        month_features["startTime"], utc=True
                     )
-                    mask = (month_features["timestamp"] >= start_datetime) & (
-                        month_features["timestamp"] <= end_datetime
+                    mask = (month_features["startTime"] >= start_datetime) & (
+                        month_features["startTime"] <= end_datetime
                     )
                 else:
                     logger.warning(
-                        f"No 'timestamp' column found in data for {month_year}. Skipping filtering by date."
+                        f"No 'startTime' column found in data for {month_year}. Skipping filtering by date."
                     )
                     mask = pd.Series(True, index=month_features.index)
 

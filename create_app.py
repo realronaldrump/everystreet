@@ -1,13 +1,7 @@
-"""
-This module creates and configures the Quart application for the EveryStreet project.
-It initializes various components and sets up the necessary configurations.
-"""
-
 import os
 import sys
 import asyncio
 
-# Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from quart import Quart
@@ -21,30 +15,15 @@ from waco_streets_analyzer import WacoStreetsAnalyzer
 from routes import register_routes
 
 async def create_app():
-    """
-    Asynchronously creates and configures the Quart application.
-
-    This function initializes the Quart app, sets up CORS, configures the app
-    with necessary settings, and initializes various components such as
-    BouncieAPI, WacoStreetsAnalyzer, and GeoJSONHandler.
-
-    Returns:
-        Quart: The configured Quart application instance.
-    """
     app = cors(Quart(__name__))
     config = Config()
-    print(app.config)
-    app.config.from_mapping(
-        {k: v for k, v in config.dict().items() if k not in ["Config"]}
-    )
+    app.config.from_mapping(config.dict())
     app.secret_key = config.SECRET_KEY
     app.config["SESSION_TYPE"] = "filesystem"
 
-    # Create necessary directories
     os.makedirs("static", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
 
-    # Initialize app attributes
     app.historical_data_loaded = False
     app.historical_data_loading = False
     app.is_processing = False
@@ -52,22 +31,18 @@ async def create_app():
     app.live_route_data = load_live_route_data()
     app.clear_live_route = False
 
-    # Asynchronous Locks
     app.historical_data_lock = asyncio.Lock()
     app.processing_lock = asyncio.Lock()
     app.live_route_lock = asyncio.Lock()
     app.progress_lock = asyncio.Lock()
 
-    # Initialize BouncieAPI (Single Instance)
-    app.bouncie_api = BouncieAPI(app.config)
+    app.bouncie_api = BouncieAPI(config)
     logger.info("BouncieAPI initialized successfully")
 
-    # Initialize WacoStreetsAnalyzer
     app.waco_streets_analyzer = WacoStreetsAnalyzer("static/Waco-Streets.geojson")
     await app.waco_streets_analyzer.initialize()
     logger.info("WacoStreetsAnalyzer initialized successfully")
 
-    # Initialize GeoJSONHandler (Pass the single BouncieAPI instance)
     app.geojson_handler = GeoJSONHandler(app.waco_streets_analyzer, app.bouncie_api)
     await app.geojson_handler.load_historical_data()
     logger.info("GeoJSONHandler initialized successfully")
@@ -78,16 +53,11 @@ async def create_app():
 
     @app.before_serving
     async def startup():
-        """
-        Executes before the application starts serving requests.
-        Any additional startup tasks can be added here.
-        """
+        pass
 
     @app.after_request
     async def add_header(response):
-        response.headers['Cache-Control'] = (
-            'no-store, no-cache, must-revalidate, max-age=0'
-        )
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '-1'
         return response

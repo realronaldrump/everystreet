@@ -1,48 +1,32 @@
 import logging
-
-from bounciepy import AsyncRESTAPIClient
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
-
 class BouncieClient:
-    def __init__(self, client_id, client_secret, redirect_uri, auth_code, device_imei, vehicle_id):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.redirect_uri = redirect_uri
-        self.auth_code = auth_code
+    def __init__(self, authorization, device_imei):
+        self.authorization = authorization
         self.device_imei = device_imei
-        self.vehicle_id = vehicle_id
+        self.base_url = "https://api.bouncie.dev/v1"
 
-        if not all(
-            [
-                self.client_id,
-                self.client_secret,
-                self.redirect_uri,
-                self.auth_code,
-                self.vehicle_id,
-                self.device_imei,
-            ]
-        ):
-            raise ValueError("Missing required environment variables for BouncieAPI")
+    async def get_trips(self, starts_after, ends_before):
+        url = f"{self.base_url}/trips"
+        params = {
+            "imei": self.device_imei,
+            "gps-format": "geojson",
+            "starts-after": starts_after,
+            "ends-before": ends_before
+        }
+        headers = {
+            "Accept": "application/json",
+            "Authorization": self.authorization,
+            "Content-Type": "application/json"
+        }
 
-        self.client = AsyncRESTAPIClient(
-            client_id=self.client_id,
-            client_secret=self.client_secret,
-            redirect_url=self.redirect_uri,
-            auth_code=self.auth_code,
-        )
-
-    async def get_access_token(self):
-        try:
-            success = await self.client.get_access_token()
-            if not success:
-                logger.error("Failed to obtain access token.")
-                return False
-            return True
-        except Exception as e:
-            logger.error(f"Error getting access token: {e}")
-            return False
-
-    async def get_vehicle_by_imei(self):
-        return await self.client.get_vehicle_by_imei(imei=self.device_imei)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    logger.error(f"Error fetching trips: {response.status}")
+                    return None

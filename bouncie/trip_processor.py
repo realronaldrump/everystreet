@@ -1,7 +1,5 @@
 import logging
-import numpy as np
 from datetime import datetime, timezone
-from geopy.distance import geodesic
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +20,10 @@ class TripProcessor:
             prev_point = live_trip_data["data"][i - 1]
             curr_point = live_trip_data["data"][i]
 
-            distance = geodesic(
-                (prev_point["latitude"], prev_point["longitude"]),
-                (curr_point["latitude"], curr_point["longitude"]),
-            ).miles
-            total_distance += distance
-
+            total_distance += curr_point["trip_data"]["distance"]
             time_diff = curr_point["timestamp"] - prev_point["timestamp"]
             total_time += time_diff
-
-            max_speed = max(max_speed, curr_point["speed"])
+            max_speed = max(max_speed, curr_point["trip_data"]["maxSpeed"])
 
             if start_time is None:
                 start_time = prev_point["timestamp"]
@@ -50,9 +42,9 @@ class TripProcessor:
 
     @staticmethod
     def _format_time(seconds):
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        seconds = seconds % 60
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        seconds = int(seconds % 60)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
     @staticmethod
@@ -65,41 +57,40 @@ class TripProcessor:
                 logger.warning(f"Skipping non-dict trip data: {trip}")
                 continue
 
-            coordinates = []
-            timestamps = []
-            for band in trip.get("bands", []):
-                for path in band.get("paths", []):
-                    path_array = np.array(path)
-                    if path_array.shape[1] >= 5:  # Check for lat, lon, timestamp at least
-                        for lat, lon, _, _, timestamp in path_array[:, [0, 1, 2, 3, 4]]:
-                            if timestamp is None:
-                                logger.warning(f"Skipping point with None timestamp: {path}")
-                                continue
+            coordinates = trip['gps']['coordinates']
+            
+            # Remove duplicate coordinates while maintaining order
+            unique_coordinates = []
+            seen = set()
+            for coord in coordinates:
+                coord_tuple = tuple(coord)
+                if coord_tuple not in seen:
+                    seen.add(coord_tuple)
+                    unique_coordinates.append(coord)
 
-                            try:
-                                iso_timestamp = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
-                            except (TypeError, ValueError) as e:
-                                logger.error(f"Invalid timestamp {timestamp}: {str(e)}. Skipping point.")
-                                continue
-
-                            coordinates.append([lon, lat])
-                            timestamps.append(iso_timestamp)
-                    else:
-                        logger.warning(f"Skipping invalid path: {path}")
-
-            if len(coordinates) > 1 and timestamps:
+            if len(unique_coordinates) > 1:
                 feature = {
                     "type": "Feature",
-                    "geometry": {"type": "LineString", "coordinates": coordinates},
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": unique_coordinates
+                    },
                     "properties": {
-                        "timestamp": timestamps[0],
-                        "end_timestamp": timestamps[-1],
-                        "timestamps": timestamps
+                        "transactionId": trip.get('transactionId'),
+                        "startTime": trip.get('startTime'),
+                        "endTime": trip.get('endTime'),
+                        "distance": trip.get('distance'),
+                        "averageSpeed": trip.get('averageSpeed'),
+                        "maxSpeed": trip.get('maxSpeed'),
+                        "hardBrakingCount": trip.get('hardBrakingCount'),
+                        "hardAccelerationCount": trip.get('hardAccelerationCount'),
+                        "fuelConsumed": trip.get('fuelConsumed'),
+                        "totalIdleDuration": trip.get('totalIdleDuration'),
                     },
                 }
                 features.append(feature)
             else:
-                logger.warning(f"Skipping trip with insufficient data: coordinates={len(coordinates)}, timestamps={len(timestamps)}")
+                logger.warning(f"Skipping trip with insufficient unique coordinates: {len(unique_coordinates)}")
 
         logger.info(f"Created {len(features)} GeoJSON features from trip data")
         return features

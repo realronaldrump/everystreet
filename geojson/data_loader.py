@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-
 class DataLoader:
     async def load_data(self, handler: Any) -> Dict[str, Any]:
         total_features = 0
@@ -85,10 +84,10 @@ class DataLoader:
                 month_features = []
 
                 for feature in data.get("features", []):
-                    timestamp = feature["properties"].get("timestamp")
-                    if timestamp and timestamp not in fetched_trip_timestamps:
+                    start_time = feature["properties"].get("startTime")
+                    if start_time and start_time not in fetched_trip_timestamps:
                         month_features.append(feature)
-                        fetched_trip_timestamps.add(timestamp)
+                        fetched_trip_timestamps.add(start_time)
 
                 month_year = file.split("_")[2].split(".")[0]
                 return month_features, month_year

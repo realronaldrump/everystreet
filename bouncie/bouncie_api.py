@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from .client import BouncieClient
 from .data_fetcher import DataFetcher
@@ -8,16 +8,11 @@ from .trip_processor import TripProcessor
 
 logger = logging.getLogger(__name__)
 
-
 class BouncieAPI:
     def __init__(self, config):
         self.client = BouncieClient(
-            client_id=config["CLIENT_ID"],
-            client_secret=config["CLIENT_SECRET"],
-            redirect_uri=config["REDIRECT_URI"],
-            auth_code=config["AUTH_CODE"],
-            device_imei=config["DEVICE_IMEI"],
-            vehicle_id=config["VEHICLE_ID"],
+            authorization=config.AUTHORIZATION,
+            device_imei=config.DEVICE_IMEI,
         )
         self.data_fetcher = DataFetcher(self.client)
         self.geocoder = Geocoder()
@@ -26,10 +21,11 @@ class BouncieAPI:
 
     async def get_latest_bouncie_data(self):
         try:
-            await self.client.get_access_token()
-            vehicle_data = await self.client.get_vehicle_by_imei()
-            if not vehicle_data or "stats" not in vehicle_data:
-                logger.error("No vehicle data or stats found in Bouncie response")
+            start_time = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+            end_time = datetime.now(timezone.utc).isoformat()
+            vehicle_data = await self.client.get_trips(start_time, end_time)
+            if not vehicle_data:
+                logger.error("No vehicle data found in Bouncie response")
                 return None
 
             new_data_point = await self.data_fetcher.process_vehicle_data(vehicle_data)

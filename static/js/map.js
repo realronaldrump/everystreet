@@ -250,6 +250,10 @@ function updateLiveRouteOnMap(liveData) {
       });
     }
   }
+
+  // Update "currentLocation" element
+  const address = liveData.latest_bouncie_data?.address || "N/A";  // Extract address 
+  document.getElementById('currentLocation').textContent = address;
 }
 
 // Initialize the application

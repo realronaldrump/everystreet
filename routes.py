@@ -183,7 +183,7 @@ def register_routes(app):
     @app.websocket("/ws/live_route")
     async def ws_live_route():
         try:
-            last_sent_time = 0  # Initialize to track the last time data was sent
+            last_sent_time = 0
 
             while True:
                 current_time = time()  # Get the current timestamp

@@ -2,7 +2,7 @@ aiofiles==24.1.0
 aiohttp==3.10.5
 bounciepy==0.3.0
 cachetools==5.5.0
-geopandas==1.0.1
+geopandas
 geopy==2.4.1
 hypercorn==0.17.3
 numpy==2.1.1
@@ -17,3 +17,5 @@ Shapely==2.0.6
 tqdm==4.66.5
 redis
 polyline
+fiona>=1.10b2 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

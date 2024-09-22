@@ -32,7 +32,12 @@ class DataFetcher:
 
         async with session.get(summary_url, headers=headers) as response:
             if response.status == 200:
-                return await response.json()
+                data = await response.json()
+                # Validate the structure of the response data
+                if not isinstance(data, list):
+                    logger.error("Invalid data format received from Bouncie API")
+                    return None
+                return data
             logger.error(
                 "Error: Failed to fetch data for %s. HTTP Status code: %s",
                 date, response.status
@@ -99,9 +104,21 @@ class DataFetcher:
                 )
                 return None
 
+            # Validate latitude and longitude
+            latitude = location.get("lat")
+            longitude = location.get("lon")
+            if not isinstance(latitude, (int, float)) or not (
+                -90 <= latitude <= 90
+            ):
+                raise ValueError("Invalid latitude value")
+            if not isinstance(longitude, (int, float)) or not (
+                -180 <= longitude <= 180
+            ):
+                raise ValueError("Invalid longitude value")
+
             return {
-                "latitude": location.get("lat"),
-                "longitude": location.get("lon"),
+                "latitude": latitude,
+                "longitude": longitude,
                 "timestamp": timestamp,
                 "battery_state": battery_state,
                 "speed": stats.get("speed", 0),

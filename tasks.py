@@ -32,6 +32,16 @@ async def poll_bouncie_api(app, bouncie_api):
 
                     new_coord = [bouncie_data["longitude"], bouncie_data["latitude"]]
 
+                    # Validate coordinates
+                    if not isinstance(new_coord, list) or len(new_coord) != 2:
+                        logger.error("Invalid coordinates received from Bouncie API")
+                        continue
+                    if not all(isinstance(c, (int, float)) for c in new_coord):
+                        logger.error(
+                            "Invalid coordinate types received from Bouncie API"
+                        )
+                        continue
+
                     if (
                         not live_route_feature["geometry"]["coordinates"]
                         or new_coord

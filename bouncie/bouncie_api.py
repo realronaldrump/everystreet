@@ -28,6 +28,8 @@ class BouncieAPI:
         try:
             await self.client.get_access_token()
             vehicle_data = await self.client.get_vehicle_by_imei()
+
+            # Validate vehicle_data
             if not vehicle_data or "stats" not in vehicle_data:
                 logger.error("No vehicle data or stats found in Bouncie response")
                 return None

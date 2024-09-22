@@ -34,6 +34,36 @@ class FileHandler:
         months_to_update = set()
 
         for feature in new_features:
+            # Validate GeoJSON feature structure
+            if (
+                not isinstance(feature, dict)
+                or "geometry" not in feature
+                or "type" not in feature["geometry"]
+                or "coordinates" not in feature["geometry"]
+                or "properties" not in feature
+                or "timestamp" not in feature["properties"]
+            ):
+                logger.warning("Invalid GeoJSON feature: %s", feature)
+                continue
+            if feature["geometry"]["type"] != "LineString":
+                logger.warning(
+                    "Unsupported geometry type: %s", feature["geometry"]["type"]
+                )
+                continue
+            if not isinstance(feature["geometry"]["coordinates"], list):
+                logger.warning("Invalid coordinates: %s",
+                               feature["geometry"]["coordinates"])
+                continue
+            # Validate coordinates
+            for coord in feature["geometry"]["coordinates"]:
+                if (
+                    not isinstance(coord, list)
+                    or len(coord) != 2
+                    or not all(isinstance(c, (int, float)) for c in coord)
+                ):
+                    logger.warning("Invalid coordinates in feature: %s", feature)
+                    continue
+
             feature["geometry"]["coordinates"] = FileHandler._convert_ndarray_to_list(
                 feature["geometry"]["coordinates"]
             )

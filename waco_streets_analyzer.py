@@ -139,13 +139,33 @@ class WacoStreetsAnalyzer:
         if not routes:
             logger.warning("No routes provided for update_progress")
             return
-        valid_features = [
-            feature for feature in routes
+
+        # Validate GeoJSON features
+        valid_features = []
+        for feature in routes:
+            if not isinstance(feature, dict):
+                logger.warning("Invalid feature type: %s", type(feature))
+                continue
             if (
-                feature["geometry"]["type"] == "LineString" and
-                len(feature["geometry"]["coordinates"]) > 1
-            )
-        ]
+                "geometry" not in feature
+                or "type" not in feature["geometry"]
+                or feature["geometry"]["type"] != "LineString"
+                or "coordinates" not in feature["geometry"]
+                or not isinstance(feature["geometry"]["coordinates"], list)
+                or len(feature["geometry"]["coordinates"]) <= 1
+            ):
+                logger.warning("Invalid GeoJSON feature: %s", feature)
+                continue
+            for coord in feature["geometry"]["coordinates"]:
+                if (
+                    not isinstance(coord, list)
+                    or len(coord) != 2
+                    or not all(isinstance(c, (int, float)) for c in coord)
+                ):
+                    logger.warning("Invalid coordinates in feature: %s", feature)
+                    continue
+            valid_features.append(feature)
+
         if not valid_features:
             logger.warning("No valid features to process")
             return

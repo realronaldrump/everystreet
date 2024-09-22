@@ -6,7 +6,7 @@ from functools import wraps
 
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import box
+from shapely.geometry import box, LineString, MultiLineString
 
 from date_utils import days_ago, format_date, get_end_of_day, get_start_of_day
 from .file_handler import FileHandler
@@ -149,7 +149,54 @@ class DataProcessor:
             if month_end < start_datetime or month_start > end_datetime:
                 continue
 
-            valid_features = [f for f in features if f["geometry"]["type"] == "LineString" and len(f["geometry"]["coordinates"]) > 1]
+            valid_features = []
+            for feature in features:
+                # Validate GeoJSON feature structure
+                if (
+                    not isinstance(feature, dict)
+                    or "geometry" not in feature
+                    or "type" not in feature["geometry"]
+                    or "coordinates" not in feature["geometry"]
+                    or "properties" not in feature
+                    or "timestamp" not in feature["properties"]
+                ):
+                    logger.warning("Invalid GeoJSON feature: %s", feature)
+                    continue
+                if feature["geometry"]["type"] not in ["LineString", "MultiLineString"]:
+                    logger.warning(
+                        "Unsupported geometry type: %s", feature["geometry"]["type"]
+                    )
+                    continue
+                if not isinstance(feature["geometry"]["coordinates"], list):
+                    logger.warning("Invalid coordinates: %s", feature["geometry"]["coordinates"])
+                    continue
+                # Validate coordinates
+                if feature["geometry"]["type"] == "LineString":
+                    if len(feature["geometry"]["coordinates"]) <= 1:
+                        logger.warning("LineString with less than 2 coordinates: %s", feature)
+                        continue
+                    for coord in feature["geometry"]["coordinates"]:
+                        if (
+                            not isinstance(coord, list)
+                            or len(coord) != 2
+                            or not all(isinstance(c, (int, float)) for c in coord)
+                        ):
+                            logger.warning("Invalid coordinates in LineString: %s", feature)
+                            continue
+                elif feature["geometry"]["type"] == "MultiLineString":
+                    for linestring in feature["geometry"]["coordinates"]:
+                        if len(linestring) <= 1:
+                            logger.warning("LineString with less than 2 coordinates in MultiLineString: %s", feature)
+                            continue
+                        for coord in linestring:
+                            if (
+                                not isinstance(coord, list)
+                                or len(coord) != 2
+                                or not all(isinstance(c, (int, float)) for c in coord)
+                            ):
+                                logger.warning("Invalid coordinates in MultiLineString: %s", feature)
+                                continue
+                valid_features.append(feature)
 
             if not valid_features:
                 logger.warning("No valid features found for %s", month_year)
@@ -177,7 +224,25 @@ class DataProcessor:
             else:
                 clipped_features = month_features[mask]
 
-            filtered_features.extend(clipped_features.__geo_interface__["features"])
+            # Convert clipped_features to GeoJSON features and extend filtered_features
+            for _, row in clipped_features.iterrows():
+                geometry_type = row.geometry.geom_type
+                if geometry_type == "LineString":
+                    coordinates = list(row.geometry.coords)
+                elif geometry_type == "MultiLineString":
+                    coordinates = [list(line.coords) for line in row.geometry]
+                else:
+                    logger.warning("Unsupported geometry type: %s", geometry_type)
+                    continue
+
+                filtered_features.append({
+                    "type": "Feature",
+                    "geometry": {"type": geometry_type, "coordinates": coordinates},
+                    "properties": {
+                        "timestamp": row.timestamp.isoformat() if row.timestamp is not pd.NaT else None,
+                        # Add other properties as needed
+                    }
+                })
 
         logger.info("Filtered %d features", len(filtered_features))
         return filtered_features

@@ -72,6 +72,18 @@ class GeoJSONHandler:
         try:
             file_path = f"static/boundaries/{boundary_type}.geojson"
             geojson_data = await self._read_json_file(file_path)
+
+            # Validate GeoJSON data
+            if (
+                not isinstance(geojson_data, dict)
+                or "type" not in geojson_data
+                or geojson_data["type"] != "FeatureCollection"
+                or "features" not in geojson_data
+                or not isinstance(geojson_data["features"], list)
+                or len(geojson_data["features"]) != 1
+            ):
+                raise ValueError("Invalid GeoJSON data for Waco boundary")
+
             return shapely.geometry.shape(geojson_data['features'][0]['geometry'])
         except Exception as e:
             logger.error(f"Error loading Waco boundary: {e}")

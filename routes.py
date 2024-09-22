@@ -7,6 +7,7 @@ from time import time
 from cachetools import TTLCache
 from quart import (jsonify, redirect, render_template, request,
                    session, url_for, websocket, make_response)
+from pydantic import ValidationError
 
 from config import Config
 from date_utils import timedelta
@@ -91,6 +92,15 @@ def register_routes(app):
                 ),
             )
             logger.info("Received request for filtered historical data: %s", params)
+
+            # Validate wacoBoundary against allowed values
+            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            if params.waco_boundary not in allowed_waco_boundaries:
+                raise ValueError(
+                    f"Invalid wacoBoundary: {params.waco_boundary}. "
+                    f"Allowed values are: {allowed_waco_boundaries}"
+                )
+
             waco_limits = None
             if params.filter_waco and params.waco_boundary != "none":
                 waco_limits = await geojson_handler.load_waco_boundary(
@@ -109,6 +119,9 @@ def register_routes(app):
                 "total_features": len(filtered_features),
             }
             return jsonify(result)
+        except ValidationError as e:
+            logger.error("Validation error: %s", e.json())
+            return jsonify({"error": e.errors()}), 400
         except ValueError as e:
             logger.error("Error parsing parameters: %s", str(e))
             return jsonify({"error": f"Invalid parameter: {str(e)}"}), 400
@@ -121,6 +134,22 @@ def register_routes(app):
         try:
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
             streets_filter = request.args.get("filter", "all")
+
+            # Validate wacoBoundary and streetsFilter against allowed values
+            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            allowed_streets_filters = ["all", "traveled", "untraveled"]
+
+            if waco_boundary not in allowed_waco_boundaries:
+                raise ValueError(
+                    f"Invalid wacoBoundary: {waco_boundary}. "
+                    f"Allowed values are: {allowed_waco_boundaries}"
+                )
+            if streets_filter not in allowed_streets_filters:
+                raise ValueError(
+                    f"Invalid filter: {streets_filter}. "
+                    f"Allowed values are: {allowed_streets_filters}"
+                )
+
             cache_key = f"waco_streets_{waco_boundary}_{streets_filter}"
 
             cached_data = cache.get(cache_key)
@@ -170,9 +199,26 @@ def register_routes(app):
 
     @app.route("/untraveled_streets")
     async def get_untraveled_streets():
-        waco_boundary = request.args.get("wacoBoundary", "city_limits")
-        untraveled_streets = await geojson_handler.get_untraveled_streets(waco_boundary)
-        return jsonify(json.loads(untraveled_streets))
+        try:
+            waco_boundary = request.args.get("wacoBoundary", "city_limits")
+
+            # Validate wacoBoundary against allowed values
+            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            if waco_boundary not in allowed_waco_boundaries:
+                raise ValueError(
+                    f"Invalid wacoBoundary: {waco_boundary}. "
+                    f"Allowed values are: {allowed_waco_boundaries}"
+                )
+
+            untraveled_streets = await geojson_handler.get_untraveled_streets(
+                waco_boundary
+            )
+            return jsonify(json.loads(untraveled_streets))
+        except Exception as e:
+            logger.error(
+                "Error in get_untraveled_streets: %s", str(e), exc_info=True
+            )
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/latest_bouncie_data")
     async def get_latest_bouncie_data():
@@ -294,6 +340,16 @@ def register_routes(app):
                 start_date = data.get('startDate')
                 end_date = data.get('endDate')
 
+                # Validate start_date and end_date format
+                try:
+                    if start_date:
+                        datetime.strptime(start_date, "%Y-%m-%d")
+                    if end_date:
+                        datetime.strptime(end_date, "%Y-%m-%d")
+                except ValueError:
+                    return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), \
+                           400
+
                 await geojson_handler.update_historical_data(
                     fetch_all=False, start_date=start_date, end_date=end_date
                 )
@@ -312,6 +368,15 @@ def register_routes(app):
     async def get_progress_geojson():
         try:
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
+
+            # Validate wacoBoundary against allowed values
+            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            if waco_boundary not in allowed_waco_boundaries:
+                raise ValueError(
+                    f"Invalid wacoBoundary: {waco_boundary}. "
+                    f"Allowed values are: {allowed_waco_boundaries}"
+                )
+
             progress_geojson = await geojson_handler.get_progress_geojson(waco_boundary)
             return jsonify(progress_geojson)
         except Exception as e:
@@ -361,6 +426,24 @@ def register_routes(app):
             end_date = request.args.get("endDate")
             filter_waco = request.args.get("filterWaco", "false").lower() == "true"
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
+
+            # Validate start_date and end_date format
+            try:
+                if start_date:
+                    datetime.strptime(start_date, "%Y-%m-%d")
+                if end_date:
+                    datetime.strptime(end_date, "%Y-%m-%d")
+            except ValueError:
+                return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+            # Validate wacoBoundary against allowed values
+            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            if waco_boundary not in allowed_waco_boundaries:
+                raise ValueError(
+                    f"Invalid wacoBoundary: {waco_boundary}. "
+                    f"Allowed values are: {allowed_waco_boundaries}"
+                )
+
             logger.info(
                 "Fetching historical data for: %s to %s, filterWaco: %s, "
                 "wacoBoundary: %s",

@@ -531,10 +531,10 @@ footer {
 }
 
 audio[controls] {
-  background-color: var(--tertiary-bg);
+  background-color: transparent;
   border: none;
-  padding: 0.5rem;
-  border-radius: var(--border-radius);
+  padding: 0;
+  border-radius: 0;
   color: var(--text-color);
 }
 
@@ -561,7 +561,7 @@ audio[controls] {
 }
 
 /* Responsive Adjustments */
-@media (max-width: 768px) { 
+@media (max-width: 768px) {
   #map-container {
     margin-bottom: 1rem;
   }
@@ -628,14 +628,22 @@ audio[controls] {
   }
 
   .logout-container {
-    margin-left: 0; /* Reset margin for logout container */
-    order: 2; /* Place logout buttons after audio player */
+    margin-left: 0; /* Remove left margin */
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons to wrap */
+    gap: 1rem;
   }
 
+  /* Audio Player Styles */
   #audio-player {
-    order: 1; /* Place audio player before logout buttons */
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap; /* Allow audio player elements to wrap */
+    background-color: var(--secondary-bg); /* Set background color for the audio player container */
+    padding: 0.5rem; /* Add padding to the container */
+    border-radius: var(--border-radius); /* Add border radius to the container */
   }
-}
 
 @media (max-width: 480px) {
   h1 {
@@ -783,4 +791,5 @@ audio[controls] {
 
 .popup-button:hover {
   background-color: #0056b3;
+}
 }

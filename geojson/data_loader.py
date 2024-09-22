@@ -75,7 +75,9 @@ class DataLoader:
             return []
 
     @staticmethod
-    async def _process_file(file: str, fetched_trip_timestamps: Set[str]) -> tuple[List[Dict[str, Any]], str]:
+    async def _process_file(
+        file: str, fetched_trip_timestamps: Set[str]
+    ) -> tuple[List[Dict[str, Any]], str]:
         try:
             async with aiofiles.open(f"static/{file}", "r") as f:
                 data = json.loads(await f.read())

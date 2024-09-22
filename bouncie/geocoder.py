@@ -17,8 +17,11 @@ class Geocoder:
                     address = location.raw["address"]
                     formatted_address = f"{address.get('place', '')}<br>"
                     formatted_address += f"{address.get('building', '')}<br>"
-                    formatted_address += f"{address.get('house_number', '')} {address.get('road', '')}<br>"
-                    formatted_address += f"{address.get('city', '')}, {address.get('state', '')} {address.get('postcode', '')}"
+                    formatted_address += (f"{address.get('house_number', '')} "
+                                          f"{address.get('road', '')}<br>")
+                    formatted_address += (f"{address.get('city', '')}, "
+                                          f"{address.get('state', '')} "
+                                          f"{address.get('postcode', '')}")
                     return formatted_address.strip("<br>")
 
                 return "N/A"

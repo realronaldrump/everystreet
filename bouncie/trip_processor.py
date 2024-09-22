@@ -77,11 +77,17 @@ class TripProcessor:
                                 continue
 
                             try:
-                                iso_timestamp = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+                                iso_timestamp = datetime.fromtimestamp(
+                                    timestamp, timezone.utc
+                                ).isoformat()
                                 coordinates.append([lon, lat])
                                 timestamps.append(iso_timestamp)
                             except (TypeError, ValueError) as e:
-                                logger.error("Invalid timestamp %s: %s. Skipping point.", timestamp, str(e))
+                                logger.error(
+                                    "Invalid timestamp %s: %s. Skipping point.",
+                                    timestamp,
+                                    str(e)
+                                )
                     else:
                         logger.warning("Skipping invalid path: %s", path)
 
@@ -97,7 +103,11 @@ class TripProcessor:
                 }
                 features.append(feature)
             else:
-                logger.warning("Skipping trip with insufficient data: coordinates=%d, timestamps=%d", len(coordinates), len(timestamps))
+                logger.warning(
+                    "Skipping trip with insufficient data: coordinates=%d, timestamps=%d",
+                    len(coordinates),
+                    len(timestamps)
+                )
 
         logger.info("Created %d GeoJSON features from trip data", len(features))
         return features

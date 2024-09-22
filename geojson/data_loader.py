@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-
 class DataLoader:
     async def load_data(self, handler: Any) -> Dict[str, Any]:
         total_features = 0
@@ -70,11 +69,8 @@ class DataLoader:
                 for f in os.listdir("static")
                 if f.startswith("historical_data_") and f.endswith(".geojson")
             ]
-        except FileNotFoundError:
-            logger.error("The 'static' directory was not found.")
-            return []
-        except PermissionError:
-            logger.error("Permission denied when trying to access the 'static' directory.")
+        except (FileNotFoundError, PermissionError) as e:
+            logger.error(f"Error accessing 'static' directory: {str(e)}")
             return []
 
     @staticmethod
@@ -92,12 +88,6 @@ class DataLoader:
 
                 month_year = file.split("_")[2].split(".")[0]
                 return month_features, month_year
-        except json.JSONDecodeError:
-            logger.error(f"Invalid JSON in file: {file}")
-            return [], ""
-        except KeyError as e:
-            logger.error(f"Missing expected key in file {file}: {str(e)}")
-            return [], ""
-        except Exception as e:
+        except (json.JSONDecodeError, KeyError, Exception) as e:
             logger.error(f"Error processing file {file}: {str(e)}")
             return [], ""

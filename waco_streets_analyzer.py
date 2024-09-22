@@ -1,20 +1,16 @@
 import asyncio
 import logging
 import os
-import pickle
 import aiofiles
 import geopandas as gpd
 from shapely.geometry import LineString
 import json
-
-gpd.options.use_pygeos = True
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
 
 class WacoStreetsAnalyzer:
     def __init__(self, streets_geojson_path):
@@ -57,8 +53,7 @@ class WacoStreetsAnalyzer:
         try:
             async with aiofiles.open(self.cache_file, "rb") as f:
                 cache_data = await f.read()
-            cache_data = cache_data.decode('utf-8')
-            cache_dict = json.loads(cache_data)
+            cache_dict = json.loads(cache_data.decode('utf-8'))
             self.streets_gdf = cache_dict["streets_gdf"]
             self.segments_gdf = cache_dict["segments_gdf"]
             self.traveled_segments = set(cache_dict["traveled_segments"])
@@ -77,9 +72,7 @@ class WacoStreetsAnalyzer:
 
     async def _process_and_cache_data(self):
         try:
-            self.streets_gdf = await asyncio.to_thread(
-                gpd.read_file, self.streets_geojson_path
-            )
+            self.streets_gdf = gpd.read_file(self.streets_geojson_path)
             if self.streets_gdf is None or self.streets_gdf.empty:
                 raise ValueError(
                     f"Failed to load GeoJSON from {self.streets_geojson_path}"
@@ -103,8 +96,7 @@ class WacoStreetsAnalyzer:
 
     def _create_segments(self):
         segments = []
-        # skipcq: PYL-W0612
-        for idx, row in self.streets_gdf.iterrows():
+        for _, row in self.streets_gdf.iterrows():
             if isinstance(row.geometry, LineString):
                 coords = list(row.geometry.coords)
                 for i in range(len(coords) - 1):
@@ -120,15 +112,13 @@ class WacoStreetsAnalyzer:
 
     async def _save_to_cache(self):
         try:
-            cache_data = pickle.dumps(
-                {
-                    "streets_gdf": self.streets_gdf,
-                    "segments_gdf": self.segments_gdf,
-                    "traveled_segments": self.traveled_segments,
-                }
-            )
+            cache_data = json.dumps({
+                "streets_gdf": self.streets_gdf.to_json(),
+                "segments_gdf": self.segments_gdf.to_json(),
+                "traveled_segments": list(self.traveled_segments),
+            })
             async with aiofiles.open(self.cache_file, "wb") as f:
-                await f.write(cache_data)
+                await f.write(cache_data.encode('utf-8'))
         except Exception as e:
             logger.error("Error saving to cache: %s", str(e))
 
@@ -154,12 +144,9 @@ class WacoStreetsAnalyzer:
             batch_size = 10000
             for i in range(0, len(valid_features), batch_size):
                 batch = valid_features[i:i+batch_size]
-                gdf = await asyncio.to_thread(
-                    gpd.GeoDataFrame.from_features, batch
-                )
+                gdf = gpd.GeoDataFrame.from_features(batch)
                 gdf.set_crs(epsg=4326, inplace=True)
 
-                # Perform spatial join instead of iterating
                 joined = gpd.sjoin(
                     gdf,
                     self.segments_gdf,
@@ -167,7 +154,6 @@ class WacoStreetsAnalyzer:
                     predicate="intersects"
                 )
 
-                # Fix: Correctly reference the geometry for distance calculation
                 close_segments = joined[joined.apply(
                     lambda row: row.geometry.distance(
                         self.segments_gdf.loc[row.index_right].geometry
@@ -175,7 +161,6 @@ class WacoStreetsAnalyzer:
                     axis=1
                 )]
 
-                # Update traveled_segments
                 self.traveled_segments.update(close_segments['segment_id'].tolist())
 
                 logger.info(
@@ -232,9 +217,7 @@ class WacoStreetsAnalyzer:
             return {"type": "FeatureCollection", "features": []}
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = await asyncio.to_thread(
-                gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
-            )
+            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson")
             waco_limits = waco_limits.geometry.unary_union
         self.segments_gdf["traveled"] = self.segments_gdf["segment_id"].isin(
             self.traveled_segments
@@ -269,9 +252,7 @@ class WacoStreetsAnalyzer:
             return "{}"
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = await asyncio.to_thread(
-                gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
-            )
+            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson")
             waco_limits = waco_limits.geometry.unary_union
         traveled_streets = set(
             self.segments_gdf[
@@ -296,9 +277,7 @@ class WacoStreetsAnalyzer:
             return None
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = await asyncio.to_thread(
-                gpd.read_file, f"static/boundaries/{waco_boundary}.geojson"
-            )
+            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson")
             waco_limits = waco_limits.geometry.unary_union
         street_network = self.streets_gdf.copy()
         if waco_limits is not None:

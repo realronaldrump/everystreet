@@ -78,12 +78,10 @@ class TripProcessor:
 
                             try:
                                 iso_timestamp = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+                                coordinates.append([lon, lat])
+                                timestamps.append(iso_timestamp)
                             except (TypeError, ValueError) as e:
                                 logger.error(f"Invalid timestamp {timestamp}: {str(e)}. Skipping point.")
-                                continue
-
-                            coordinates.append([lon, lat])
-                            timestamps.append(iso_timestamp)
                     else:
                         logger.warning(f"Skipping invalid path: {path}")
 

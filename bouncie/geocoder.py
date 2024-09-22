@@ -1,10 +1,8 @@
 import asyncio
 import logging
-
 from geopy.geocoders import Nominatim
 
 logger = logging.getLogger(__name__)
-
 
 class Geocoder:
     def __init__(self):
@@ -13,9 +11,7 @@ class Geocoder:
     async def reverse_geocode(self, lat, lon, retries=3):
         for attempt in range(retries):
             try:
-                location = await asyncio.to_thread(
-                    self.geolocator.reverse, (lat, lon), addressdetails=True
-                )
+                location = self.geolocator.reverse((lat, lon), addressdetails=True)
                 if location:
                     address = location.raw["address"]
                     formatted_address = f"{address.get('place', '')}<br>"

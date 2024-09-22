@@ -1,3 +1,4 @@
+import aiofiles
 import asyncio
 import json
 import logging
@@ -9,7 +10,6 @@ from .data_processor import DataProcessor
 from .progress_updater import ProgressUpdater
 
 logger = logging.getLogger(__name__)
-
 
 class GeoJSONHandler:
     def __init__(self, waco_analyzer, bouncie_api):
@@ -61,6 +61,7 @@ class GeoJSONHandler:
 
     async def update_waco_streets_progress(self):
         return await self.progress_updater.update_streets_progress()
+
     def get_all_routes(self):
         logger.info(
             f"Retrieving all routes. Total features: {len(self.historical_geojson_features)}"
@@ -69,23 +70,14 @@ class GeoJSONHandler:
 
     async def load_waco_boundary(self, boundary_type):
         try:
-            if boundary_type == "city_limits":
-                file_path = "static/boundaries/city_limits.geojson"
-            elif boundary_type == "less_goofy":
-                file_path = "static/boundaries/less_goofy.geojson"
-            elif boundary_type == "goofy":
-                file_path = "static/boundaries/goofy.geojson"
-            else:
-                logger.warning(f"Unknown Waco boundary type: {boundary_type}")
-                return None
-
-            geojson_data = await asyncio.to_thread(self._read_json_file, file_path)
+            file_path = f"static/boundaries/{boundary_type}.geojson"
+            geojson_data = await self._read_json_file(file_path)
             return shapely.geometry.shape(geojson_data['features'][0]['geometry'])
         except Exception as e:
             logger.error(f"Error loading Waco boundary: {e}")
             return None
 
     @staticmethod
-    def _read_json_file(file_path):
-        with open(file_path, "r") as f:
-            return json.load(f)
+    async def _read_json_file(file_path):
+        async with aiofiles.open(file_path, "r") as f:
+            return json.loads(await f.read())

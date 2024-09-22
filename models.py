@@ -1,8 +1,6 @@
 from datetime import date
 from typing import Optional
-
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
-
 
 class DateRange(BaseModel):
     start_date: date = Field(..., description="Start date of the range")
@@ -14,7 +12,6 @@ class DateRange(BaseModel):
         if start_date and v < start_date:
             raise ValueError("end_date must be after start_date")
         return v
-
 
 class HistoricalDataParams(BaseModel):
     date_range: DateRange

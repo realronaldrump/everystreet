@@ -1,29 +1,18 @@
 from datetime import datetime, timedelta, timezone, date
 from typing import Iterator, Union
-
+from dateutil import parser
 
 def parse_date(date_string: Union[str, datetime]) -> datetime:
-    """Parse a date string to a timezone-aware datetime object."""
     if isinstance(date_string, datetime):
         return date_string.astimezone(timezone.utc)
 
     if isinstance(date_string, str):
-        # Try parsing as ISO format first
         try:
-            dt = datetime.fromisoformat(date_string.replace("Z", "+00:00"))
+            dt = parser.isoparse(date_string)
             return dt.astimezone(timezone.utc)
         except ValueError:
             pass
 
-        # Try common formats
-        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
-            try:
-                dt = datetime.strptime(date_string, fmt)
-                return dt.replace(tzinfo=timezone.utc)
-            except ValueError:
-                continue
-
-        # Try parsing timestamp
         try:
             return datetime.fromtimestamp(float(date_string), tz=timezone.utc)
         except ValueError:

@@ -55,14 +55,18 @@ class WacoStreetsAnalyzer:
             async with aiofiles.open(self.cache_file, "rb") as f:
                 cache_data = await f.read()
             cache_dict = json.loads(cache_data.decode('utf-8'))
-            self.streets_gdf = cache_dict["streets_gdf"]
-            self.segments_gdf = cache_dict["segments_gdf"]
+            
+            # Convert JSON strings back to GeoDataFrames
+            self.streets_gdf = gpd.GeoDataFrame.from_features(json.loads(cache_dict["streets_gdf"]))
+            self.segments_gdf = gpd.GeoDataFrame.from_features(json.loads(cache_dict["segments_gdf"]))
             self.traveled_segments = set(cache_dict["traveled_segments"])
+            
             if (
                 self.streets_gdf is None or self.streets_gdf.empty or
                 self.segments_gdf is None or self.segments_gdf.empty
             ):
                 raise ValueError("Invalid data loaded from cache")
+            
             logger.info(
                 "Loaded data from cache. Total streets: %s, Total segments: %s",
                 len(self.streets_gdf), len(self.segments_gdf)

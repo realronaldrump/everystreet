@@ -68,7 +68,8 @@ class DataProcessor:
             return datetime.fromtimestamp(latest_timestamp, tz=timezone.utc) + timedelta(days=1)
         return self.bouncie_api.find_first_data_date()
 
-    def _get_end_date(self, end_date):
+    @staticmethod
+    def _get_end_date(date_string, end_date):
         return datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc) if end_date else datetime.now(tz=timezone.utc)
 
     async def _fetch_data_for_date(self, date):

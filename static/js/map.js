@@ -1030,7 +1030,7 @@ function clearDrawnShapes() {
 // Filter routes by a predefined time period
 function filterRoutesBy(period) {
   const now = new Date();
-  let startDate, endDate;
+  let startDate = null, endDate = null;
 
   switch (period) {
     case 'today':
@@ -1485,7 +1485,7 @@ function setupEventListeners() {
 
 // Debounce function for search suggestions
 function debounce(func, wait) {
-  let timeout;
+  let timeout = null;
   return function executedFunction(...args) {
     const later = () => {
       clearTimeout(timeout);
@@ -1539,7 +1539,7 @@ function initializeDateRangeSlider() {
 function getSelectedDateRange() {
   const days = document.getElementById('dateRangeSlider').value;
   const endDate = new Date();
-  let startDate;
+  let startDate = null;
   
   if (days === '365') {
     startDate = new Date(2020, 0, 1); // ALL_TIME_START_DATE
@@ -1626,13 +1626,16 @@ function handleBackgroundTask(taskFunction, feedbackMessage) {
 // Disable UI elements
 function disableUI() {
   document.body.classList.add('processing');
-  document.querySelectorAll('button, input, select').forEach(el => el.disabled = true);
+  document.querySelectorAll('button, input, select').forEach(el => {
+      el.disabled = true;
+      return el.disabled;
+  });
 }
 
 // Enable UI elements
 function enableUI() {
   document.body.classList.remove('processing');
-  document.querySelectorAll('button, input, select').forEach(el => el.disabled = false);
+  document.querySelectorAll('button, input, select').forEach(el => { el.disabled = false; });
 }
 
 // Check and process queued background tasks

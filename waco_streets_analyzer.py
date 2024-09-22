@@ -246,7 +246,10 @@ class WacoStreetsAnalyzer:
             return {"type": "FeatureCollection", "features": []}
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = gpd.read_file(f"https://cdn.jsdelivr.net/gh/realronaldrump/everystreet@main/static/boundaries/{waco_boundary}.geojson")
+            waco_limits = gpd.read_file(
+                f"https://cdn.jsdelivr.net/gh/realronaldrump/everystreet@main/static/"
+                f"boundaries/{waco_boundary}.geojson"
+            )
             waco_limits = waco_limits.geometry.unary_union
         self.segments_gdf["traveled"] = self.segments_gdf["segment_id"].isin(
             self.traveled_segments

@@ -25,7 +25,6 @@ config = Config(
     AUTH_CODE=os.environ.get('AUTH_CODE', ''),
     VEHICLE_ID=os.environ.get('VEHICLE_ID', ''),
     DEVICE_IMEI=os.environ.get('DEVICE_IMEI', ''),
-    GOOGLE_MAPS_API=os.environ.get('GOOGLE_MAPS_API', ''),
     USERNAME=os.environ.get('USERNAME', ''),
     PASSWORD=os.environ.get('PASSWORD', ''),
     SECRET_KEY=os.environ.get('SECRET_KEY', '')

@@ -10,12 +10,10 @@ class Config(BaseSettings):
     VEHICLE_ID: str
     DEVICE_IMEI: str
     ENABLE_GEOCODING: bool = False
-    GOOGLE_MAPS_API: str
     DEBUG: bool = False
     USERNAME: str
     PASSWORD: str
     SECRET_KEY: str
-    FOURSQUARE_API_KEY: str
 
     class Config:
         env_file = ".env"

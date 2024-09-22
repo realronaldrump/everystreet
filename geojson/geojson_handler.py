@@ -86,7 +86,7 @@ class GeoJSONHandler:
 
             return shapely.geometry.shape(geojson_data['features'][0]['geometry'])
         except Exception as e:
-            logger.error(f"Error loading Waco boundary: {e}")
+            logger.error("Error loading Waco boundary: %s", e)
             return None
 
     @staticmethod

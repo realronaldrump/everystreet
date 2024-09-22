@@ -6,7 +6,7 @@ from functools import wraps
 
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import box, LineString, MultiLineString
+from shapely.geometry import box
 
 from date_utils import days_ago, format_date, get_end_of_day, get_start_of_day
 from .file_handler import FileHandler
@@ -113,9 +113,13 @@ class DataProcessor:
             await self.file_handler.update_monthly_files(handler, unique_new_features)
             handler.historical_geojson_features.extend(unique_new_features)
             handler.fetched_trip_timestamps.update(
-                feature["properties"]["timestamp"] for feature in unique_new_features
+                feature["properties"]["timestamp"]
+                for feature in unique_new_features
             )
-            logger.info("Added %d new unique features to historical_geojson_features", len(unique_new_features))
+            logger.info(
+                "Added %d new unique features to historical_geojson_features",
+                len(unique_new_features)
+            )
 
     @log_method
     async def process_routes_and_update_progress(self, handler):
@@ -168,12 +172,15 @@ class DataProcessor:
                     )
                     continue
                 if not isinstance(feature["geometry"]["coordinates"], list):
-                    logger.warning("Invalid coordinates: %s", feature["geometry"]["coordinates"])
+                    logger.warning(
+                        "Invalid coordinates: %s", feature["geometry"]["coordinates"]
+                    )
                     continue
                 # Validate coordinates
                 if feature["geometry"]["type"] == "LineString":
                     if len(feature["geometry"]["coordinates"]) <= 1:
-                        logger.warning("LineString with less than 2 coordinates: %s", feature)
+                        logger.warning(
+                            "LineString with less than 2 coordinates: %s", feature)
                         continue
                     for coord in feature["geometry"]["coordinates"]:
                         if (

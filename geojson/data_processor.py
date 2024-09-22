@@ -1,8 +1,12 @@
 import logging
+import asyncio
+import json
+from functools import wraps
+from datetime import datetime, timedelta, timezone
+
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import box
-from datetime import datetime, timedelta, timezone
 
 from date_utils import get_start_of_day, get_end_of_day, format_date, days_ago
 from .file_handler import FileHandler
@@ -11,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def log_method(func):
-    @wraps(func)
+    @wraps(func)  # 'wraps' is now imported from functools
     async def wrapper(*args, **kwargs):
         logger.info("Starting %s", func.__name__)
         try:
@@ -36,14 +40,14 @@ class DataProcessor:
 
     @log_method
     async def update_and_process_data(self, handler, fetch_all=False,
-                                     start_date=None, end_date=None):
+                                      start_date=None, end_date=None):
         await self.fetch_all_historical_data(handler, fetch_all, start_date,
-                                            end_date)
+                                             end_date)
         await self.process_routes_and_update_progress(handler)
 
     @log_method
     async def fetch_all_historical_data(self, handler, fetch_all=False,
-                                     start_date=None, end_date=None):
+                                        start_date=None, end_date=None):
         async with self.waco_analyzer.lock:
             start_date = self._get_start_date(handler, fetch_all, start_date)
             end_date = self._get_end_date(end_date)
@@ -238,7 +242,7 @@ class DataProcessor:
                                 not isinstance(coord, list)
                                 or len(coord) != 2
                                 or not all(isinstance(c, (int, float))
-                                       for c in coord)
+                                           for c in coord)
                             ):
                                 logger.warning(
                                     "Invalid coordinates in "
@@ -298,7 +302,9 @@ class DataProcessor:
                 elif geometry_type == "MultiLineString":
                     coordinates = [list(line.coords) for line in geometry]
                 else:
-                    logger.warning("Unsupported geometry type: %s", geometry_type)
+                    logger.warning(
+                        "Unsupported geometry type: %s", geometry_type
+                    )
                     continue
 
                 # Access other properties from the original GeoDataFrame using the index

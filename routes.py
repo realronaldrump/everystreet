@@ -121,7 +121,7 @@ def register_routes(app):
             return jsonify(result)
         except ValidationError as e:
             logger.error("Validation error: %s", e.json())
-            return jsonify({"error": e.errors()}), 400
+            return jsonify({"error": [str(err) for err in e.errors()]}), 400
         except ValueError as e:
             logger.error("Error parsing parameters: %s", str(e))
             return jsonify({"error": f"Invalid parameter: {str(e)}"}), 400

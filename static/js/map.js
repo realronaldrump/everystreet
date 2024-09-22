@@ -206,6 +206,13 @@ function updateLiveRouteOnMap(liveData) {
     return;
   }
 
+  // Validate coordinates
+  if (!coordinates.every(coord => Array.isArray(coord) && coord.length === 2 && 
+      typeof coord[0] === 'number' && typeof coord[1] === 'number')) {
+    console.warn('Received live data with invalid coordinates');
+    return;
+  }
+
   // Convert coordinates to LatLng objects
   const latLngs = coordinates.map(coord => L.latLng(coord[1], coord[0]));
 
@@ -576,6 +583,12 @@ async function fetchHistoricalData(startDate = null, endDate = null) {
     const wacoBoundary = document.getElementById('wacoBoundarySelect').value;
     const startDateParam = startDate || document.getElementById('startDate').value;
     const endDateParam = endDate || document.getElementById('endDate').value;
+
+    // Basic validation for start and end dates
+    if (!isValidDate(startDateParam) || !isValidDate(endDateParam)) {
+      showFeedback('Invalid date format. Please use YYYY-MM-DD.', 'error');
+      return { type: "FeatureCollection", features: [] };
+    }
 
     const response = await fetch(
       `/filtered_historical_data?startDate=${startDateParam}&endDate=${endDateParam}` +
@@ -1639,6 +1652,12 @@ function removeLayer(layer) {
 // Helper function to format a date
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
+}
+
+// Helper function to validate a date string
+function isValidDate(dateString) {
+  const date = new Date(dateString);
+  return !isNaN(date.getTime());
 }
 
 // Expose functions for debugging (optional)

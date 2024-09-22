@@ -55,7 +55,10 @@ async def create_app():
     logger.info("BouncieAPI initialized successfully")
 
     # Initialize WacoStreetsAnalyzer
-    app.waco_streets_analyzer = WacoStreetsAnalyzer("static/Waco-Streets.geojson")
+    app.waco_streets_analyzer = WacoStreetsAnalyzer(
+        "https://cdn.jsdelivr.net/gh/realronaldrump/everystreet@main/"
+        "static/Waco-Streets.geojson"
+    )
     await app.waco_streets_analyzer.initialize()
     logger.info("WacoStreetsAnalyzer initialized successfully")
 

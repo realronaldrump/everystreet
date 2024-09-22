@@ -3,8 +3,6 @@ import json
 import logging
 from datetime import date, datetime, timezone
 from time import time
-from redis import Redis
-
 from cachetools import TTLCache
 from quart import (jsonify, redirect, render_template, request,
                    session, url_for, websocket, make_response)
@@ -124,10 +122,11 @@ def register_routes(app):
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
             streets_filter = request.args.get("filter", "all")
             cache_key = f"waco_streets_{waco_boundary}_{streets_filter}"
-            redis_client = Redis()  # Create a Redis client
-            cached_data = redis_client.get(cache_key)
+
+            cached_data = cache.get(cache_key)
             if cached_data:
-                return jsonify(json.loads(cached_data))
+                return jsonify(cached_data)
+
             logger.info(
                 "Fetching Waco streets: boundary=%s, filter=%s",
                 waco_boundary, streets_filter
@@ -138,7 +137,8 @@ def register_routes(app):
             streets_data = json.loads(streets_geojson)
             if "features" not in streets_data:
                 raise ValueError("Invalid GeoJSON: 'features' key not found")
-            redis_client.setex(cache_key, 3600, json.dumps(streets_data))
+
+            cache[cache_key] = streets_data
             logger.info("Returning %d street features", len(streets_data['features']))
             return jsonify(streets_data)
         except Exception as e:
@@ -179,7 +179,6 @@ def register_routes(app):
         async with app.live_route_lock:
             return jsonify(getattr(app, "latest_bouncie_data", {}))
 
-    @app.websocket("/ws/live_route")
     @app.websocket("/ws/live_route")
     async def ws_live_route():
         try:
@@ -371,11 +370,9 @@ def register_routes(app):
             if filter_waco:
                 waco_limits = await geojson_handler.load_waco_boundary(
                     waco_boundary
-                )  # Await the coroutine
-            filtered_features = (
-                await geojson_handler.filter_geojson_features(  # Await the coroutine
-                    start_date, end_date, filter_waco, waco_limits
                 )
+            filtered_features = await geojson_handler.filter_geojson_features(
+                start_date, end_date, filter_waco, waco_limits
             )
             return jsonify({"type": "FeatureCollection", "features": filtered_features})
         except Exception as e:

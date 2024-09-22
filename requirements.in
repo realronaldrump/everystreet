@@ -1,0 +1,17 @@
+aiofiles
+aiohttp
+bounciepy
+geopandas
+geopy
+hypercorn
+numpy
+pandas
+pydantic
+pydantic_settings
+python_dateutil
+quart
+quart_cors
+rtree
+Shapely
+tqdm
+cachetools

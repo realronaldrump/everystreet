@@ -71,7 +71,7 @@ class DataLoader:
                 if f.startswith("historical_data_") and f.endswith(".geojson")
             ]
         except (FileNotFoundError, PermissionError) as e:
-            logger.error(f"Error accessing 'static' directory: {str(e)}")
+            logger.error("Error accessing 'static' directory: %s", str(e))
             return []
 
     @staticmethod
@@ -89,6 +89,6 @@ class DataLoader:
 
                 month_year = file.split("_")[2].split(".")[0]
                 return month_features, month_year
-        except (json.JSONDecodeError, KeyError, Exception) as e:
-            logger.error(f"Error processing file {file}: {str(e)}")
+        except Exception as e:
+            logger.error("Error processing file %s: %s", file, str(e))
             return [], ""

@@ -57,8 +57,12 @@ class WacoStreetsAnalyzer:
             cache_dict = json.loads(cache_data.decode('utf-8'))
 
             # Convert JSON strings back to GeoDataFrames
-            self.streets_gdf = gpd.GeoDataFrame.from_features(json.loads(cache_dict["streets_gdf"]))
-            self.segments_gdf = gpd.GeoDataFrame.from_features(json.loads(cache_dict["segments_gdf"]))
+            self.streets_gdf = gpd.GeoDataFrame.from_features(
+                json.loads(cache_dict["streets_gdf"])
+            )
+            self.segments_gdf = gpd.GeoDataFrame.from_features(
+                json.loads(cache_dict["segments_gdf"])
+            )
             self.traveled_segments = set(cache_dict["traveled_segments"])
 
             if (

@@ -17,6 +17,7 @@ from routes import register_routes
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
 async def create_app():
     """
     Asynchronously creates and configures the Quart application.
@@ -73,8 +74,6 @@ async def create_app():
         Executes before the application starts serving requests.
         Any additional startup tasks can be added here.
         """
-        pass
-
     @app.after_request
     async def add_header(response):
         response.headers['Cache-Control'] = (

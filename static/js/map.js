@@ -99,7 +99,7 @@ function setupWebSocketConnections() {
     const socket = new WebSocket(url);
     
     socket.onopen = () => {
-      console.log('WebSocket connection established');
+      
       showFeedback('Live route connection established', 'success');
     };
 
@@ -113,7 +113,7 @@ function setupWebSocketConnections() {
     
     socket.onclose = (event) => {
       if (event.wasClean) {
-        console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
+        
       } else {
         console.error('WebSocket connection abruptly closed');
         showFeedback('Live route connection lost. Reconnecting...', 'warning');

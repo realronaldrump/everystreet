@@ -152,11 +152,11 @@ class DataProcessor:
 
         progress = self.waco_analyzer.calculate_progress()
         logger.info("Updated progress: %s", progress)
-        return progress
+    return progress
 
     @staticmethod
     async def filter_features(handler, start_date, end_date, filter_waco,
-                          waco_limits, bounds=None):
+                  waco_limits, bounds=None):
     start_datetime = get_start_of_day(start_date)
     end_datetime = get_end_of_day(end_date)
 

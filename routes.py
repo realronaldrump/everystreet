@@ -6,6 +6,7 @@ from time import time
 from cachetools import TTLCache
 from quart import (jsonify, redirect, render_template, request,
                    session, url_for, websocket, make_response)
+from quart_cors import cors
 
 from config import Config
 from date_utils import timedelta
@@ -17,36 +18,23 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 import os
 
-config = Config(
-    PIN=os.environ.get('PIN', ''),
-    CLIENT_ID=os.environ.get('CLIENT_ID', ''),
-    CLIENT_SECRET=os.environ.get('CLIENT_SECRET', ''),
-    REDIRECT_URI=os.environ.get('REDIRECT_URI', ''),
-    AUTH_CODE=os.environ.get('AUTH_CODE', ''),
-    VEHICLE_ID=os.environ.get('VEHICLE_ID', ''),
-    DEVICE_IMEI=os.environ.get('DEVICE_IMEI', ''),
-    USERNAME=os.environ.get('USERNAME', ''),
-    PASSWORD=os.environ.get('PASSWORD', ''),
-    SECRET_KEY=os.environ.get('SECRET_KEY', '')
-)
+config = Config()
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
-
 
 def no_cache(view_function):
     @wraps(view_function)
     async def no_cache_impl(*args, **kwargs):
         response = await make_response(await view_function(*args, **kwargs))
-        response.headers['Cache-Control'] = (
-            'no-store, no-cache, must-revalidate, max-age=0'
-        )
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '-1'
         return response
     return no_cache_impl
 
-
 def register_routes(app):
+    app = cors(app, allow_origin="*")  # Configure CORS for all routes
+
     waco_analyzer = app.waco_streets_analyzer
     geojson_handler = app.geojson_handler
     bouncie_api = app.bouncie_api
@@ -59,18 +47,14 @@ def register_routes(app):
                 if coverage_analysis is None:
                     raise ValueError("Failed to update Waco streets progress")
                 logger.info("Progress update: %s", coverage_analysis)
-                return jsonify(
-                    {
-                        "total_streets": int(coverage_analysis["total_streets"]),
-                        "traveled_streets": int(coverage_analysis["traveled_streets"]),
-                        "coverage_percentage": float(
-                            coverage_analysis["coverage_percentage"]
-                        ),
-                    }
-                )
+                return jsonify({
+                    "total_streets": int(coverage_analysis["total_streets"]),
+                    "traveled_streets": int(coverage_analysis["traveled_streets"]),
+                    "coverage_percentage": float(coverage_analysis["coverage_percentage"]),
+                })
             except Exception as e:
                 logger.error("Error in get_progress: %s", str(e), exc_info=True)
-                return jsonify({"error": str(e)}), 500
+                return jsonify({"error": "An internal error occurred"}), 500
 
     @app.route("/filtered_historical_data")
     async def get_filtered_historical_data():
@@ -78,8 +62,7 @@ def register_routes(app):
             params = HistoricalDataParams(
                 date_range=DateRange(
                     start_date=request.args.get("startDate") or "2020-01-01",
-                    end_date=request.args.get("endDate")
-                    or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    end_date=request.args.get("endDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 ),
                 filter_waco=request.args.get("filterWaco", "false").lower() == "true",
                 waco_boundary=request.args.get("wacoBoundary", "city_limits"),
@@ -92,9 +75,7 @@ def register_routes(app):
             logger.info("Received request for filtered historical data: %s", params)
             waco_limits = None
             if params.filter_waco and params.waco_boundary != "none":
-                waco_limits = await geojson_handler.load_waco_boundary(
-                    params.waco_boundary
-                )
+                waco_limits = await geojson_handler.load_waco_boundary(params.waco_boundary)
             filtered_features = await geojson_handler.filter_geojson_features(
                 params.date_range.start_date.isoformat(),
                 params.date_range.end_date.isoformat(),
@@ -110,10 +91,10 @@ def register_routes(app):
             return jsonify(result)
         except ValueError as e:
             logger.error("Error parsing parameters: %s", str(e))
-            return jsonify({"error": f"Invalid parameter: {str(e)}"}), 400
+            return jsonify({"error": "Invalid parameters provided"}), 400
         except Exception as e:
             logger.error("Error filtering historical data: %s", str(e), exc_info=True)
-            return jsonify({"error": f"Error filtering historical data: {str(e)}"}), 500
+            return jsonify({"error": "An error occurred while processing your request"}), 500
 
     @app.route("/waco_streets")
     async def get_waco_streets():
@@ -130,9 +111,7 @@ def register_routes(app):
                 "Fetching Waco streets: boundary=%s, filter=%s",
                 waco_boundary, streets_filter
             )
-            streets_geojson = await geojson_handler.get_waco_streets(
-                waco_boundary, streets_filter
-            )
+            streets_geojson = await geojson_handler.get_waco_streets(waco_boundary, streets_filter)
             streets_data = json.loads(streets_geojson)
             if "features" not in streets_data:
                 raise ValueError("Invalid GeoJSON: 'features' key not found")
@@ -142,30 +121,22 @@ def register_routes(app):
             return jsonify(streets_data)
         except Exception as e:
             logger.error("Error in get_waco_streets: %s", str(e), exc_info=True)
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "An error occurred while fetching street data"}), 500
 
     @app.route("/update_progress", methods=["POST"])
+    @login_required
     async def update_progress():
         async with app.progress_lock:
             try:
                 coverage_analysis = await geojson_handler.update_all_progress()
-                return (
-                    jsonify(
-                        {
-                            "total_streets": int(coverage_analysis["total_streets"]),
-                            "traveled_streets": int(
-                                coverage_analysis["traveled_streets"]
-                            ),
-                            "coverage_percentage": float(
-                                coverage_analysis["coverage_percentage"]
-                            ),
-                        }
-                    ),
-                    200,
-                )
+                return jsonify({
+                    "total_streets": int(coverage_analysis["total_streets"]),
+                    "traveled_streets": int(coverage_analysis["traveled_streets"]),
+                    "coverage_percentage": float(coverage_analysis["coverage_percentage"]),
+                }), 200
             except Exception as e:
                 logger.error("Error updating progress: %s", str(e), exc_info=True)
-                return jsonify({"error": f"Error updating progress: {str(e)}"}), 500
+                return jsonify({"error": "An error occurred while updating progress"}), 500
 
     @app.route("/untraveled_streets")
     async def get_untraveled_streets():
@@ -181,66 +152,41 @@ def register_routes(app):
     @app.websocket("/ws/live_route")
     async def ws_live_route():
         try:
-            last_sent_time = 0  # Initialize to track the last time data was sent
-
+            last_sent_time = 0
             while True:
-                current_time = time()  # Get the current timestamp
-
-                # Calculate the time difference since the last update
+                current_time = time()
                 time_diff = current_time - last_sent_time
-
-                if time_diff >= 1:  # Check if at least 1 second has passed
+                if time_diff >= 1:
                     async with app.live_route_lock:
                         data = app.live_route_data
-
-                    # Send the live route data to the client over the WebSocket
-                    # connection
                     await websocket.send(json.dumps(data))
-
-                    # Update the last_sent_time to the current time
                     last_sent_time = current_time
-
-                # Wait a small amount of time before the next check, e.g., 1 second
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
-            # Handle WebSocket disconnection
             pass
 
     @app.route("/historical_data_status")
     async def historical_data_status():
         async with app.historical_data_lock:
-            return jsonify(
-                {
-                    "loaded": app.historical_data_loaded,
-                    "loading": app.historical_data_loading,
-                }
-            )
+            return jsonify({
+                "loaded": app.historical_data_loaded,
+                "loading": app.historical_data_loading,
+            })
 
     @app.websocket("/ws/trip_metrics")
     async def ws_trip_metrics():
         try:
-            last_sent_time = 0  # Initialize to track the last time data was sent
-
+            last_sent_time = 0
             while True:
-                current_time = time()  # Get the current timestamp
-
-                # Calculate the time difference since the last update
+                current_time = time()
                 time_diff = current_time - last_sent_time
-
-                if time_diff >= 1:  # Check if at least 1 seconds have passed
+                if time_diff >= 1:
                     async with app.live_route_lock:
                         formatted_metrics = await app.bouncie_api.get_trip_metrics()
-
-                    # Send the trip metrics to the client over the WebSocket connection
                     await websocket.send(json.dumps(formatted_metrics))
-
-                    # Update the last_sent_time to the current time
                     last_sent_time = current_time
-
-                # Wait a small amount of time before the next check, e.g., 1 second
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
-            # Handle WebSocket disconnection
             pass
 
     @app.route("/search_location")
@@ -251,13 +197,11 @@ def register_routes(app):
         try:
             location = await asyncio.to_thread(geolocator.geocode, query)
             if location:
-                return jsonify(
-                    {
-                        "latitude": location.latitude,
-                        "longitude": location.longitude,
-                        "address": location.address,
-                    }
-                )
+                return jsonify({
+                    "latitude": location.latitude,
+                    "longitude": location.longitude,
+                    "address": location.address,
+                })
             return jsonify({"error": "Location not found"}), 404
         except Exception as e:
             logger.error("Error during location search: %s", e)
@@ -281,6 +225,7 @@ def register_routes(app):
             return jsonify({"error": "An error occurred during the search"}), 500
 
     @app.route("/update_historical_data", methods=["POST"])
+    @login_required
     async def update_historical_data():
         async with app.processing_lock:
             if app.is_processing:
@@ -293,17 +238,17 @@ def register_routes(app):
                 start_date = data.get('startDate')
                 end_date = data.get('endDate')
 
+                if not start_date or not end_date:
+                    return jsonify({"error": "Missing required parameters"}), 400
+
                 await geojson_handler.update_historical_data(
                     fetch_all=False, start_date=start_date, end_date=end_date
                 )
                 logger.info("Historical data update process completed")
-                return (
-                    jsonify({"message": "Historical data updated successfully!"}),
-                    200
-                )
+                return jsonify({"message": "Historical data updated successfully!"}), 200
             except Exception as e:
                 logger.error("An error occurred during the update process: %s", e)
-                return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+                return jsonify({"error": "An error occurred during the update process"}), 500
             finally:
                 app.is_processing = False
 
@@ -315,7 +260,7 @@ def register_routes(app):
             return jsonify(progress_geojson)
         except Exception as e:
             logger.error("Error getting progress GeoJSON: %s", str(e), exc_info=True)
-            return jsonify({"error": f"Error getting progress GeoJSON: {str(e)}"}), 500
+            return jsonify({"error": "An error occurred while fetching progress data"}), 500
 
     @app.route("/processing_status")
     async def processing_status():
@@ -331,25 +276,13 @@ def register_routes(app):
             try:
                 app.is_processing = True
                 logger.info("Starting progress reset process")
-                # Reset the progress in the WacoStreetsAnalyzer
                 await waco_analyzer.reset_progress()
-                # Recalculate the progress using all historical data
                 await geojson_handler.update_all_progress()
                 logger.info("Progress reset and recalculated successfully")
-                return (
-                    jsonify(
-                        {
-                            "message": "Progress has been reset and "
-                            "recalculated successfully!"
-                        }
-                    ),
-                    200,
-                )
+                return jsonify({"message": "Progress has been reset and recalculated successfully!"}), 200
             except Exception as e:
-                logger.error(
-                    "An error occurred during the progress reset process: %s", e
-                )
-                return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+                logger.error("An error occurred during the progress reset process: %s", e)
+                return jsonify({"error": "An error occurred during the progress reset process"}), 500
             finally:
                 app.is_processing = False
 
@@ -361,22 +294,19 @@ def register_routes(app):
             filter_waco = request.args.get("filterWaco", "false").lower() == "true"
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
             logger.info(
-                "Fetching historical data for: %s to %s, filterWaco: %s, "
-                "wacoBoundary: %s",
+                "Fetching historical data for: %s to %s, filterWaco: %s, wacoBoundary: %s",
                 start_date, end_date, filter_waco, waco_boundary
             )
             waco_limits = None
             if filter_waco:
-                waco_limits = await geojson_handler.load_waco_boundary(
-                    waco_boundary
-                )
+                waco_limits = await geojson_handler.load_waco_boundary(waco_boundary)
             filtered_features = await geojson_handler.filter_geojson_features(
                 start_date, end_date, filter_waco, waco_limits
             )
             return jsonify({"type": "FeatureCollection", "features": filtered_features})
         except Exception as e:
             logger.error("Error fetching historical data: %s", str(e), exc_info=True)
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "An error occurred while fetching historical data"}), 500
 
     @app.route("/live_data")
     async def get_live_data():
@@ -392,9 +322,7 @@ def register_routes(app):
             if pin == app.config["PIN"]:
                 session["authenticated"] = True
                 return redirect(url_for("index"))
-            return await render_template(
-                "login.html", error="Invalid PIN. Please try again."
-            )
+            return await render_template("login.html", error="Invalid PIN. Please try again.")
         return await render_template("login.html")
 
     @app.route("/logout", methods=["GET", "POST"])
@@ -407,10 +335,7 @@ def register_routes(app):
     @no_cache
     async def index():
         today = datetime.now().strftime("%Y-%m-%d")
-        # Calculate the start date for the last month
-        last_month_start = (date.today().replace(day=1) - timedelta(days=1)).replace(
-            day=1
-        )
+        last_month_start = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
         async with app.historical_data_lock:
             return await render_template(
                 "index.html",
@@ -425,7 +350,6 @@ def register_routes(app):
         logger.info("Starting application initialization...")
         try:
             logger.info("Initializing historical data...")
-            # Load historical data but do not update progress yet
             await load_historical_data_background(app, geojson_handler)
             logger.info("Historical data initialized without progress update.")
             if not hasattr(app, "background_tasks_started"):

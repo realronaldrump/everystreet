@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
+
 class DataLoader:
     async def load_data(self, handler: Any) -> Dict[str, Any]:
         total_features = 0

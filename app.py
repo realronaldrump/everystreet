@@ -3,13 +3,11 @@ import sys
 import asyncio
 import logging
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
-
 from create_app import create_app
 from utils import setup_logging
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 LOG_DIRECTORY = "logs"
 os.makedirs(LOG_DIRECTORY, exist_ok=True)
@@ -17,6 +15,7 @@ log_file = os.path.join(LOG_DIRECTORY, "app.log")
 
 setup_logging(log_file)
 logger = logging.getLogger(__name__)
+
 
 async def run_app():
     logger.info("Creating app...")

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone, date
 from typing import Iterator, Union
 from dateutil import parser
 
+
 def parse_date(date_string: Union[str, datetime]) -> datetime:
     if isinstance(date_string, datetime):
         return date_string.astimezone(timezone.utc)

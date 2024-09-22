@@ -12,6 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 class WacoStreetsAnalyzer:
     def __init__(self, streets_geojson_path):
         self.streets_geojson_path = streets_geojson_path

@@ -11,6 +11,7 @@ from .progress_updater import ProgressUpdater
 
 logger = logging.getLogger(__name__)
 
+
 class GeoJSONHandler:
     def __init__(self, waco_analyzer, bouncie_api):
         self.waco_analyzer = waco_analyzer

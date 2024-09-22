@@ -58,11 +58,11 @@ class TripProcessor:
     @staticmethod
     def create_geojson_features_from_trips(data):
         features = []
-        logger.info(f"Processing {len(data)} trips")
+        logger.info("Processing %d trips", len(data))
 
         for trip in data:
             if not isinstance(trip, dict):
-                logger.warning(f"Skipping non-dict trip data: {trip}")
+                logger.warning("Skipping non-dict trip data: %s", trip)
                 continue
 
             coordinates = []
@@ -73,7 +73,7 @@ class TripProcessor:
                     if path_array.shape[1] >= 5:  # Check for lat, lon, timestamp at least
                         for lat, lon, _, _, timestamp in path_array[:, [0, 1, 2, 3, 4]]:
                             if timestamp is None:
-                                logger.warning(f"Skipping point with None timestamp: {path}")
+                                logger.warning("Skipping point with None timestamp: %s", path)
                                 continue
 
                             try:
@@ -81,9 +81,9 @@ class TripProcessor:
                                 coordinates.append([lon, lat])
                                 timestamps.append(iso_timestamp)
                             except (TypeError, ValueError) as e:
-                                logger.error(f"Invalid timestamp {timestamp}: {str(e)}. Skipping point.")
+                                logger.error("Invalid timestamp %s: %s. Skipping point.", timestamp, str(e))
                     else:
-                        logger.warning(f"Skipping invalid path: {path}")
+                        logger.warning("Skipping invalid path: %s", path)
 
             if len(coordinates) > 1 and timestamps:
                 feature = {
@@ -97,7 +97,7 @@ class TripProcessor:
                 }
                 features.append(feature)
             else:
-                logger.warning(f"Skipping trip with insufficient data: coordinates={len(coordinates)}, timestamps={len(timestamps)}")
+                logger.warning("Skipping trip with insufficient data: coordinates=%d, timestamps=%d", len(coordinates), len(timestamps))
 
-        logger.info(f"Created {len(features)} GeoJSON features from trip data")
+        logger.info("Created %d GeoJSON features from trip data", len(features))
         return features

@@ -4,6 +4,7 @@ from geopy.geocoders import Nominatim
 
 logger = logging.getLogger(__name__)
 
+
 class Geocoder:
     def __init__(self):
         self.geolocator = Nominatim(user_agent="bouncie_viewer", timeout=10)

@@ -99,22 +99,22 @@ function setupWebSocketConnections() {
     const socket = new WebSocket(url);
     
     socket.onopen = () => {
-      
+      // Feedback to show that the WebSocket connection is established
       showFeedback('Live route connection established', 'success');
     };
 
     socket.onmessage = handlers.onmessage;
     
     socket.onerror = () => {
+      // Log and show feedback on WebSocket error
       console.error('WebSocket error');
       showFeedback('Error in WebSocket connection', 'error');
       handlers.onerror();
     };
     
     socket.onclose = (event) => {
-      if (event.wasClean) {
-        
-      } else {
+      if (!event.wasClean) {
+        // Log and attempt to reconnect if the WebSocket connection was not closed cleanly
         console.error('WebSocket connection abruptly closed');
         showFeedback('Live route connection lost. Reconnecting...', 'warning');
       }
@@ -126,14 +126,15 @@ function setupWebSocketConnections() {
 
   liveDataSocket = connectWebSocket(`${wsBaseUrl}/ws/live_route`, {
     onmessage: (event) => {
+      // Handle incoming messages by updating the live route on the map
       const liveData = JSON.parse(event.data);
       updateLiveRouteOnMap(liveData);
     },
     onerror: () => {
+      // Log error specific to live route WebSocket
       console.error('Error in live route WebSocket');
     }
   });
-
 
   // Fetch initial live route data
   fetchInitialLiveRouteData();

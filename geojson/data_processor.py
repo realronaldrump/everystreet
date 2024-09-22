@@ -1,14 +1,10 @@
-import asyncio
-import json
 import logging
-from datetime import datetime, timedelta, timezone
-from functools import wraps
-
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import box, LineString, MultiLineString  # Correct import
+from shapely.geometry import box
+from datetime import datetime, timedelta, timezone
 
-from date_utils import days_ago, format_date, get_end_of_day, get_start_of_day
+from date_utils import get_start_of_day, get_end_of_day, format_date, days_ago
 from .file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
@@ -294,33 +290,32 @@ class DataProcessor:
             else:
                 clipped_features = month_features[mask]
 
-            # Convert clipped_features to GeoJSON features and extend
-            # filtered_features
-            for _, row in clipped_features.iterrows():
-                geometry_type = row.geometry.geom_type
+            # Iterate over the GeoSeries items
+            for index, geometry in clipped_features.items():
+                geometry_type = geometry.geom_type
                 if geometry_type == "LineString":
-                    coordinates = list(row.geometry.coords)
+                    coordinates = list(geometry.coords)
                 elif geometry_type == "MultiLineString":
-                    coordinates = [list(line.coords)
-                                  for line in row.geometry]
+                    coordinates = [list(line.coords) for line in geometry]
                 else:
-                    logger.warning(
-                        "Unsupported geometry type: %s", geometry_type
-                    )
+                    logger.warning("Unsupported geometry type: %s", geometry_type)
                     continue
+
+                # Access other properties from the original GeoDataFrame using the index
+                row = month_features.loc[index]
 
                 filtered_features.append(
                     {
                         "type": "Feature",
                         "geometry": {
                             "type": geometry_type,
-                            "coordinates": coordinates
+                            "coordinates": coordinates,
                         },
                         "properties": {
                             "timestamp": row.timestamp.isoformat()
                             if row.timestamp is not pd.NaT
                             else None,
-                        }
+                        },
                     }
                 )
 

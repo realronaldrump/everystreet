@@ -300,7 +300,7 @@ class DataProcessor:
                 if geometry_type == "LineString":
                     coordinates = list(geometry.coords)
                 elif geometry_type == "MultiLineString":
-                    coordinates = [list(line.coords) for line in geometry]
+                    coordinates = [list(line.coords) for line in geometry.geoms]  # Modified line
                 else:
                     logger.warning(
                         "Unsupported geometry type: %s", geometry_type

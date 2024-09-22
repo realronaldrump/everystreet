@@ -178,7 +178,7 @@ class WacoStreetsAnalyzer:
 
                 joined = gpd.sjoin(
                     gdf,
-                    self.segments_gdf,
+                    self.segments_gdf.to_crs(epsg=4326),
                     how="inner",
                     predicate="intersects"
                 )

@@ -2,17 +2,11 @@
 This module creates and configures the Quart application for the EveryStreet project.
 It initializes various components and sets up the necessary configurations.
 """
-
 import os
 import sys
 import asyncio
-
-# Add the project root to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from quart import Quart
 from quart_cors import cors
-
 from bouncie import BouncieAPI
 from config import Config
 from geojson import GeoJSONHandler
@@ -20,23 +14,20 @@ from utils import TaskManager, load_live_route_data, logger
 from waco_streets_analyzer import WacoStreetsAnalyzer
 from routes import register_routes
 
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 async def create_app():
     """
     Asynchronously creates and configures the Quart application.
-
-    This function initializes the Quart app, sets up CORS, configures the app
-    with necessary settings, and initializes various components such as
-    BouncieAPI, WacoStreetsAnalyzer, and GeoJSONHandler.
 
     Returns:
         Quart: The configured Quart application instance.
     """
     app = cors(Quart(__name__))
     config = Config()
-    print(app.config)
-    app.config.from_mapping(
-        {k: v for k, v in config.dict().items() if k not in ["Config"]}
-    )
+
+    app.config.from_mapping({k: v for k, v in config.dict().items() if k != "Config"})
     app.secret_key = config.SECRET_KEY
     app.config["SESSION_TYPE"] = "filesystem"
 
@@ -82,6 +73,7 @@ async def create_app():
         Executes before the application starts serving requests.
         Any additional startup tasks can be added here.
         """
+        pass
 
     @app.after_request
     async def add_header(response):

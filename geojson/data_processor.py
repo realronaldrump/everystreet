@@ -17,18 +17,20 @@ logger = logging.getLogger(__name__)
 def log_method(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        logger.info(f"Starting {func.__name__}")
+        logger.info("Starting %s", func.__name__)
         try:
             result = await func(*args, **kwargs)
-            logger.info(f"Finished {func.__name__}")
+            logger.info("Finished %s", func.__name__)
             return result
         except Exception as e:
-            logger.error(f"Error in {func.__name__}: {str(e)}", exc_info=True)
+            logger.error("Error in %s: %s", func.__name__, str(e), exc_info=True)
             raise
     return wrapper
 
+
 class DataProcessor:
-    def __init__(self, waco_analyzer, bouncie_api, concurrency=100, start_date=datetime(2020, 8, 1, tzinfo=timezone.utc)):
+    def __init__(self, waco_analyzer, bouncie_api, concurrency=100,
+                 start_date=datetime(2020, 8, 1, tzinfo=timezone.utc)):
         self.waco_analyzer = waco_analyzer
         self.bouncie_api = bouncie_api
         self.file_handler = FileHandler()
@@ -69,28 +71,32 @@ class DataProcessor:
         return self.bouncie_api.find_first_data_date()
 
     @staticmethod
-    def _get_end_date(date_string, end_date):
-        return datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc) if end_date else datetime.now(tz=timezone.utc)
+    def _get_end_date(end_date):
+        return (
+            datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            if end_date
+            else datetime.now(tz=timezone.utc)
+        )
 
     async def _fetch_data_for_date(self, date):
         async with self.semaphore:
             try:
-                logger.info(f"Fetching trips for {date.strftime('%Y-%m-%d')}")
+                logger.info("Fetching trips for %s", date.strftime("%Y-%m-%d"))
                 trips = await self.bouncie_api.fetch_trip_data(date, date)
-                logger.info(f"Fetched {len(trips)} trips for {date.strftime('%Y-%m-%d')}")
+                logger.info("Fetched %d trips for %s", len(trips), date.strftime("%Y-%m-%d"))
                 return date, trips
             except Exception as e:
-                logger.error(f"Error fetching data for {date}: {str(e)}")
+                logger.error("Error fetching data for %s: %s", date, str(e))
                 return date, None
 
     async def _process_fetched_results(self, handler, results):
         for date, trips in results:
             if not trips:
-                logger.info(f"No trips found for {date.strftime('%Y-%m-%d')}")
+                logger.info("No trips found for %s", date.strftime("%Y-%m-%d"))
                 continue
 
             new_features = self.bouncie_api.create_geojson_features_from_trips(trips)
-            logger.info(f"Created {len(new_features)} new features from trips on {date}")
+            logger.info("Created %d new features from trips on %s", len(new_features), date)
 
             if not new_features:
                 continue
@@ -109,7 +115,7 @@ class DataProcessor:
             handler.fetched_trip_timestamps.update(
                 feature["properties"]["timestamp"] for feature in unique_new_features
             )
-            logger.info(f"Added {len(unique_new_features)} new unique features to historical_geojson_features")
+            logger.info("Added %d new unique features to historical_geojson_features", len(unique_new_features))
 
     @log_method
     async def process_routes_and_update_progress(self, handler):
@@ -119,7 +125,7 @@ class DataProcessor:
             await self.waco_analyzer.update_progress(batch)
 
         progress = self.waco_analyzer.calculate_progress()
-        logger.info(f"Updated progress: {progress}")
+        logger.info("Updated progress: %s", progress)
         return progress
 
     @staticmethod
@@ -127,7 +133,7 @@ class DataProcessor:
         start_datetime = get_start_of_day(start_date)
         end_datetime = get_end_of_day(end_date)
 
-        logger.info(f"Filtering features from {start_datetime} to {end_datetime}, filter_waco={filter_waco}")
+        logger.info("Filtering features from %s to %s, filter_waco=%s", start_datetime, end_datetime, filter_waco)
 
         if not handler.monthly_data:
             logger.warning("No historical data loaded yet. Returning empty features.")
@@ -146,20 +152,20 @@ class DataProcessor:
             valid_features = [f for f in features if f["geometry"]["type"] == "LineString" and len(f["geometry"]["coordinates"]) > 1]
 
             if not valid_features:
-                logger.warning(f"No valid features found for {month_year}")
+                logger.warning("No valid features found for %s", month_year)
                 continue
 
             try:
                 month_features = gpd.GeoDataFrame.from_features(valid_features)
             except Exception as e:
-                logger.error(f"Error creating GeoDataFrame for {month_year}: {str(e)}")
+                logger.error("Error creating GeoDataFrame for %s: %s", month_year, str(e))
                 continue
 
             if "timestamp" in month_features.columns:
                 month_features["timestamp"] = pd.to_datetime(month_features["timestamp"], utc=True)
                 mask = (month_features["timestamp"] > start_datetime) & (month_features["timestamp"] <= end_datetime)
             else:
-                logger.warning(f"No 'timestamp' column found in data for {month_year}. Skipping filtering by date.")
+                logger.warning("No 'timestamp' column found in data for %s. Skipping filtering by date.", month_year)
                 mask = pd.Series(True, index=month_features.index)
 
             if bounding_box:
@@ -173,7 +179,7 @@ class DataProcessor:
 
             filtered_features.extend(clipped_features.__geo_interface__["features"])
 
-        logger.info(f"Filtered {len(filtered_features)} features")
+        logger.info("Filtered %d features", len(filtered_features))
         return filtered_features
 
     @log_method
@@ -194,12 +200,12 @@ class DataProcessor:
             logger.error("Failed to get street network")
             return json.dumps({"error": "Failed to get street network"})
 
-        logger.info(f"Total streets before filtering: {len(street_network)}")
+        logger.info("Total streets before filtering: %d", len(street_network))
 
         if streets_filter == "traveled":
             street_network = street_network[street_network["traveled"]]
         elif streets_filter == "untraveled":
             street_network = street_network[~street_network["traveled"]]
 
-        logger.info(f"Streets after filtering: {len(street_network)}")
+        logger.info("Streets after filtering: %d", len(street_network))
         return street_network.to_json()

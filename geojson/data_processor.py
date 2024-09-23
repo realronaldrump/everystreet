@@ -286,16 +286,13 @@ class DataProcessor:
             if bounding_box:
                 mask &= month_features.intersects(bounding_box)
 
-            if filter_waco:  # Check filter_waco first
-                if not waco_limits.is_empty:
-                    mask &= month_features.intersects(waco_limits)
-                    clipped_features = month_features[mask].intersection(
-                        waco_limits
-                    )
-                else:
-                    clipped_features = month_features[mask]  # Use the mask directly if waco_limits is empty
+            filtered_mask = mask.copy()  # Create a copy of the mask
+
+            if filter_waco and waco_limits:
+                filtered_mask &= month_features.intersects(waco_limits)  # Use the copy
+                clipped_features = month_features[filtered_mask].intersection(waco_limits)
             else:
-                clipped_features = month_features[mask]  # Use the mask directly if filter_waco is False
+                clipped_features = month_features[mask]
 
             # Iterate over the GeoSeries items
             for index, geometry in clipped_features.items():

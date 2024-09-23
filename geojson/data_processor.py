@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def log_method(func):
-    @wraps(func)  # 'wraps' is now imported from functools
+    @wraps(func)
     async def wrapper(*args, **kwargs):
         logger.info("Starting %s", func.__name__)
         try:
@@ -286,13 +286,16 @@ class DataProcessor:
             if bounding_box:
                 mask &= month_features.intersects(bounding_box)
 
-            if filter_waco and not waco_limits.is_empty:
-                mask &= month_features.intersects(waco_limits)
-                clipped_features = month_features[mask].intersection(
-                    waco_limits
-                )
+            if filter_waco:  # Check filter_waco first
+                if not waco_limits.is_empty:
+                    mask &= month_features.intersects(waco_limits)
+                    clipped_features = month_features[mask].intersection(
+                        waco_limits
+                    )
+                else:
+                    clipped_features = month_features[mask]  # Use the mask directly if waco_limits is empty
             else:
-                clipped_features = month_features[mask]
+                clipped_features = month_features[mask]  # Use the mask directly if filter_waco is False
 
             # Iterate over the GeoSeries items
             for index, geometry in clipped_features.items():
@@ -300,7 +303,7 @@ class DataProcessor:
                 if geometry_type == "LineString":
                     coordinates = list(geometry.coords)
                 elif geometry_type == "MultiLineString":
-                    coordinates = [list(line.coords) for line in geometry.geoms]  # Modified line
+                    coordinates = [list(line.coords) for line in geometry.geoms]
                 else:
                     logger.warning(
                         "Unsupported geometry type: %s", geometry_type

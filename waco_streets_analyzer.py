@@ -12,7 +12,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 class WacoStreetsAnalyzer:
     def __init__(self, streets_geojson_path):
         self.streets_geojson_path = streets_geojson_path
@@ -65,6 +64,10 @@ class WacoStreetsAnalyzer:
             )
             self.traveled_segments = set(cache_dict["traveled_segments"])
 
+            # Ensure CRS is set for both GeoDataFrames
+            self.streets_gdf = self.streets_gdf.set_crs(epsg=4326, allow_override=True)
+            self.segments_gdf = self.segments_gdf.set_crs(epsg=4326, allow_override=True)
+
             if (
                 self.streets_gdf is None or self.streets_gdf.empty or
                 self.segments_gdf is None or self.segments_gdf.empty
@@ -81,8 +84,8 @@ class WacoStreetsAnalyzer:
 
     async def _process_and_cache_data(self):
         try:
-            self.streets_gdf = gpd.read_file(self.streets_geojson_path, crs='epsg:4326') 
-            self.streets_gdf = self.streets_gdf.set_crs("EPSG:4326", allow_override=True)
+            self.streets_gdf = gpd.read_file(self.streets_geojson_path)
+            self.streets_gdf = self.streets_gdf.set_crs(epsg=4326, allow_override=True)
             if self.streets_gdf is None or self.streets_gdf.empty:
                 raise ValueError(
                     f"Failed to load GeoJSON from {self.streets_geojson_path}"
@@ -118,8 +121,7 @@ class WacoStreetsAnalyzer:
                             "segment_id": f"{row.street_id}_{i}",
                         }
                     )
-        # Set the CRS for segments_gdf
-        return gpd.GeoDataFrame(segments, crs=self.streets_gdf.crs) 
+        return gpd.GeoDataFrame(segments, crs=self.streets_gdf.crs)
 
     async def _save_to_cache(self):
         try:
@@ -175,12 +177,14 @@ class WacoStreetsAnalyzer:
             batch_size = 10000
             for i in range(0, len(valid_features), batch_size):
                 batch = valid_features[i:i+batch_size]
-                gdf = gpd.GeoDataFrame.from_features(batch)
-                gdf.set_crs(epsg=4326, inplace=True)
+                gdf = gpd.GeoDataFrame.from_features(batch, crs="EPSG:4326")
+
+                # Ensure both GeoDataFrames have the same CRS
+                gdf = gdf.to_crs(self.segments_gdf.crs)
 
                 joined = gpd.sjoin(
                     gdf,
-                    self.segments_gdf.to_crs(epsg=4326),
+                    self.segments_gdf,
                     how="inner",
                     predicate="intersects"
                 )

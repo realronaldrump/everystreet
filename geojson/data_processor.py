@@ -286,7 +286,7 @@ class DataProcessor:
             if bounding_box:
                 mask &= month_features.intersects(bounding_box)
 
-            if filter_waco and waco_limits:
+            if filter_waco and not waco_limits.is_empty:
                 mask &= month_features.intersects(waco_limits)
                 clipped_features = month_features[mask].intersection(
                     waco_limits

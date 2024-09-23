@@ -82,6 +82,7 @@ class WacoStreetsAnalyzer:
     async def _process_and_cache_data(self):
         try:
             self.streets_gdf = gpd.read_file(self.streets_geojson_path)
+            self.streets_gdf = self.streets_gdf.set_crs("EPSG:4326", allow_override=True)
             if self.streets_gdf is None or self.streets_gdf.empty:
                 raise ValueError(
                     f"Failed to load GeoJSON from {self.streets_geojson_path}"

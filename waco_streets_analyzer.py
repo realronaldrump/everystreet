@@ -118,7 +118,8 @@ class WacoStreetsAnalyzer:
                             "segment_id": f"{row.street_id}_{i}",
                         }
                     )
-        return gpd.GeoDataFrame(segments, crs=self.streets_gdf.crs)
+        # Set the CRS for segments_gdf
+        return gpd.GeoDataFrame(segments, crs=self.streets_gdf.crs) 
 
     async def _save_to_cache(self):
         try:

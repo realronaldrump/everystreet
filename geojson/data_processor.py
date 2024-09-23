@@ -289,8 +289,9 @@ class DataProcessor:
             filtered_mask = mask.copy()  # Create a copy of the mask
 
             if filter_waco and waco_limits:
-                filtered_mask &= month_features.intersects(waco_limits)  # Use the copy
-                clipped_features = month_features[filtered_mask].intersection(waco_limits)
+                filtered_mask &= month_features.intersects(waco_limits).any()
+                # Intersection only when filtering by Waco
+                clipped_features = month_features[filtered_mask].intersection(waco_limits) 
             else:
                 clipped_features = month_features[mask]
 

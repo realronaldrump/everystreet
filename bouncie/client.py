@@ -6,7 +6,9 @@ logger = logging.getLogger(__name__)
 
 
 class BouncieClient:
-    def __init__(self, client_id, client_secret, redirect_uri, auth_code, device_imei, vehicle_id):
+    def __init__(
+        self, client_id, client_secret, redirect_uri, auth_code, device_imei, vehicle_id
+    ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri

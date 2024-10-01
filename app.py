@@ -37,6 +37,7 @@ async def run_app():
     finally:
         await app.shutdown()
 
+
 if __name__ == "__main__":
     logger.info("Starting application...")
     asyncio.run(run_app())

@@ -1,0 +1,7 @@
+[flake8]
+exclude = 
+    .git,
+    __pycache__,
+    new_env,
+    venv,
+    env

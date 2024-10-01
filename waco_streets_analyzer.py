@@ -7,10 +7,10 @@ from shapely.geometry import LineString
 import json
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
 
 class WacoStreetsAnalyzer:
     def __init__(self, streets_geojson_path):
@@ -33,7 +33,8 @@ class WacoStreetsAnalyzer:
             logger.info(
                 "WacoStreetsAnalyzer initialized. Total streets: %s, "
                 "Total segments: %s",
-                len(self.streets_gdf), len(self.segments_gdf)
+                len(self.streets_gdf),
+                len(self.segments_gdf),
             )
         except Exception as e:
             logger.error("Error during WacoStreetsAnalyzer initialization: %s", str(e))
@@ -53,7 +54,7 @@ class WacoStreetsAnalyzer:
         try:
             async with aiofiles.open(self.cache_file, "rb") as f:
                 cache_data = await f.read()
-            cache_dict = json.loads(cache_data.decode('utf-8'))
+            cache_dict = json.loads(cache_data.decode("utf-8"))
 
             # Convert JSON strings back to GeoDataFrames
             self.streets_gdf = gpd.GeoDataFrame.from_features(
@@ -66,17 +67,22 @@ class WacoStreetsAnalyzer:
 
             # Ensure CRS is set for both GeoDataFrames
             self.streets_gdf = self.streets_gdf.set_crs(epsg=4326, allow_override=True)
-            self.segments_gdf = self.segments_gdf.set_crs(epsg=4326, allow_override=True)
+            self.segments_gdf = self.segments_gdf.set_crs(
+                epsg=4326, allow_override=True
+            )
 
             if (
-                self.streets_gdf is None or self.streets_gdf.empty or
-                self.segments_gdf is None or self.segments_gdf.empty
+                self.streets_gdf is None
+                or self.streets_gdf.empty
+                or self.segments_gdf is None
+                or self.segments_gdf.empty
             ):
                 raise ValueError("Invalid data loaded from cache")
 
             logger.info(
                 "Loaded data from cache. Total streets: %s, Total segments: %s",
-                len(self.streets_gdf), len(self.segments_gdf)
+                len(self.streets_gdf),
+                len(self.segments_gdf),
             )
         except Exception as e:
             logger.error("Error loading from cache: %s", str(e))
@@ -101,7 +107,8 @@ class WacoStreetsAnalyzer:
             logger.info(
                 "Processed and cached street data. Total streets: %d, "
                 "Total segments: %d",
-                len(self.streets_gdf), len(self.segments_gdf)
+                len(self.streets_gdf),
+                len(self.segments_gdf),
             )
         except Exception as e:
             logger.error("Error processing street data: %s", str(e))
@@ -125,13 +132,15 @@ class WacoStreetsAnalyzer:
 
     async def _save_to_cache(self):
         try:
-            cache_data = json.dumps({
-                "streets_gdf": self.streets_gdf.to_json(),
-                "segments_gdf": self.segments_gdf.to_json(),
-                "traveled_segments": list(self.traveled_segments),
-            })
+            cache_data = json.dumps(
+                {
+                    "streets_gdf": self.streets_gdf.to_json(),
+                    "segments_gdf": self.segments_gdf.to_json(),
+                    "traveled_segments": list(self.traveled_segments),
+                }
+            )
             async with aiofiles.open(self.cache_file, "wb") as f:
-                await f.write(cache_data.encode('utf-8'))
+                await f.write(cache_data.encode("utf-8"))
         except Exception as e:
             logger.error("Error saving to cache: %s", str(e))
 
@@ -176,31 +185,31 @@ class WacoStreetsAnalyzer:
         try:
             batch_size = 10000
             for i in range(0, len(valid_features), batch_size):
-                batch = valid_features[i:i+batch_size]
+                batch = valid_features[i : i + batch_size]
                 gdf = gpd.GeoDataFrame.from_features(batch, crs="EPSG:4326")
 
                 # Ensure both GeoDataFrames have the same CRS
                 gdf = gdf.to_crs(self.segments_gdf.crs)
 
                 joined = gpd.sjoin(
-                    gdf,
-                    self.segments_gdf,
-                    how="inner",
-                    predicate="intersects"
+                    gdf, self.segments_gdf, how="inner", predicate="intersects"
                 )
 
-                close_segments = joined[joined.apply(
-                    lambda row: row.geometry.distance(
-                        self.segments_gdf.loc[row.index_right].geometry
-                    ) <= self.snap_distance,
-                    axis=1
-                )]
+                close_segments = joined[
+                    joined.apply(
+                        lambda row: row.geometry.distance(
+                            self.segments_gdf.loc[row.index_right].geometry
+                        )
+                        <= self.snap_distance,
+                        axis=1,
+                    )
+                ]
 
-                self.traveled_segments.update(close_segments['segment_id'].tolist())
+                self.traveled_segments.update(close_segments["segment_id"].tolist())
 
                 logger.info(
                     "Batch processed. Total traveled segments: %s",
-                    len(self.traveled_segments)
+                    len(self.traveled_segments),
                 )
 
             logger.info("Progress update completed.")

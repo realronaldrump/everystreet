@@ -2,6 +2,7 @@
 This module creates and configures the Quart application for the EveryStreet project.
 It initializes various components and sets up the necessary configurations.
 """
+
 import os
 import sys
 import asyncio
@@ -77,13 +78,14 @@ async def create_app():
         Executes before the application starts serving requests.
         Any additional startup tasks can be added here.
         """
+
     @app.after_request
     async def add_header(response):
-        response.headers['Cache-Control'] = (
-            'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, max-age=0"
         )
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '-1'
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "-1"
         return response
 
     return app

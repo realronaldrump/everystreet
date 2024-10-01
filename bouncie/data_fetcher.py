@@ -40,7 +40,8 @@ class DataFetcher:
                 return data
             logger.error(
                 "Error: Failed to fetch data for %s. HTTP Status code: %s",
-                date, response.status
+                date,
+                response.status,
             )
             return None
 
@@ -84,9 +85,9 @@ class DataFetcher:
 
             bouncie_status = stats.get("battery", {}).get("status", "unknown")
             battery_state = (
-                "full" if bouncie_status == "normal" else
-                "unplugged" if bouncie_status == "low" else
-                "unknown"
+                "full"
+                if bouncie_status == "normal"
+                else "unplugged" if bouncie_status == "low" else "unknown"
             )
 
             last_updated = stats.get("lastUpdated")
@@ -99,17 +100,13 @@ class DataFetcher:
             elif isinstance(last_updated, (int, float)):
                 timestamp = int(last_updated)
             else:
-                logger.error(
-                    "Unexpected lastUpdated format: %s", last_updated
-                )
+                logger.error("Unexpected lastUpdated format: %s", last_updated)
                 return None
 
             # Validate latitude and longitude
             latitude = location.get("lat")
             longitude = location.get("lon")
-            if not isinstance(latitude, (int, float)) or not (
-                -90 <= latitude <= 90
-            ):
+            if not isinstance(latitude, (int, float)) or not (-90 <= latitude <= 90):
                 raise ValueError("Invalid latitude value")
             if not isinstance(longitude, (int, float)) or not (
                 -180 <= longitude <= 180

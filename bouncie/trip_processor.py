@@ -5,6 +5,7 @@ from geopy.distance import geodesic
 
 logger = logging.getLogger(__name__)
 
+
 class TripProcessor:
     @staticmethod
     def calculate_metrics(live_trip_data):
@@ -41,8 +42,16 @@ class TripProcessor:
             "total_distance": round(total_distance, 2),
             "total_time": TripProcessor._format_time(total_time),
             "max_speed": max_speed,
-            "start_time": datetime.fromtimestamp(start_time, timezone.utc).isoformat() if start_time else "N/A",
-            "end_time": datetime.fromtimestamp(end_time, timezone.utc).isoformat() if end_time else "N/A",
+            "start_time": (
+                datetime.fromtimestamp(start_time, timezone.utc).isoformat()
+                if start_time
+                else "N/A"
+            ),
+            "end_time": (
+                datetime.fromtimestamp(end_time, timezone.utc).isoformat()
+                if end_time
+                else "N/A"
+            ),
         }
 
         logger.info(f"Returning trip metrics: {formatted_metrics}")
@@ -70,10 +79,14 @@ class TripProcessor:
             for band in trip.get("bands", []):
                 for path in band.get("paths", []):
                     path_array = np.array(path)
-                    if path_array.shape[1] >= 5:  # Check for lat, lon, timestamp at least
+                    if (
+                        path_array.shape[1] >= 5
+                    ):  # Check for lat, lon, timestamp at least
                         for lat, lon, _, _, timestamp in path_array[:, [0, 1, 2, 3, 4]]:
                             if timestamp is None:
-                                logger.warning("Skipping point with None timestamp: %s", path)
+                                logger.warning(
+                                    "Skipping point with None timestamp: %s", path
+                                )
                                 continue
 
                             try:
@@ -86,7 +99,7 @@ class TripProcessor:
                                 logger.error(
                                     "Invalid timestamp %s: %s. Skipping point.",
                                     timestamp,
-                                    str(e)
+                                    str(e),
                                 )
                     else:
                         logger.warning("Skipping invalid path: %s", path)
@@ -98,7 +111,7 @@ class TripProcessor:
                     "properties": {
                         "timestamp": timestamps[0],
                         "end_timestamp": timestamps[-1],
-                        "timestamps": timestamps
+                        "timestamps": timestamps,
                     },
                 }
                 features.append(feature)
@@ -106,7 +119,7 @@ class TripProcessor:
                 logger.warning(
                     "Skipping trip with insufficient data: coordinates=%d, timestamps=%d",
                     len(coordinates),
-                    len(timestamps)
+                    len(timestamps),
                 )
 
         logger.info("Created %d GeoJSON features from trip data", len(features))

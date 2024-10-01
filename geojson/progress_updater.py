@@ -1,5 +1,7 @@
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 class ProgressUpdater:
     def __init__(self, waco_analyzer):
@@ -12,7 +14,9 @@ class ProgressUpdater:
             logger.info("Total features to process: %d", total_features)
 
             # Await the progress update if it's an async operation
-            await self.waco_analyzer.update_progress(handler.historical_geojson_features)
+            await self.waco_analyzer.update_progress(
+                handler.historical_geojson_features
+            )
 
             # Calculate progress once and reuse the result
             final_coverage = self.waco_analyzer.calculate_progress()
@@ -22,8 +26,9 @@ class ProgressUpdater:
             traveled_segments = final_coverage["traveled_segments"]
             total_segments = final_coverage["total_segments"]
 
-            logger.info("Progress updated successfully. Coverage: %.2f%%",
-                        coverage_percentage)
+            logger.info(
+                "Progress updated successfully. Coverage: %.2f%%", coverage_percentage
+            )
             logger.info("Streets: %d / %d", traveled_streets, total_streets)
             logger.info("Segments: %d / %d", traveled_segments, total_segments)
 
@@ -44,5 +49,7 @@ class ProgressUpdater:
             logger.info(f"Raw coverage analysis: {coverage_analysis}")
             return coverage_analysis
         except Exception as e:
-            logger.error(f"Error updating Waco streets progress: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error updating Waco streets progress: {str(e)}", exc_info=True
+            )
             return None

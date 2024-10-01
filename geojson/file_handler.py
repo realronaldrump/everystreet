@@ -51,8 +51,9 @@ class FileHandler:
                 )
                 continue
             if not isinstance(feature["geometry"]["coordinates"], list):
-                logger.warning("Invalid coordinates: %s",
-                               feature["geometry"]["coordinates"])
+                logger.warning(
+                    "Invalid coordinates: %s", feature["geometry"]["coordinates"]
+                )
                 continue
             # Validate coordinates
             for coord in feature["geometry"]["coordinates"]:
@@ -91,9 +92,7 @@ class FileHandler:
             await FileHandler._write_updated_monthly_files(
                 handler.monthly_data, months_to_update
             )
-            logger.info(
-                "Updated monthly files for %d months", len(months_to_update)
-            )
+            logger.info("Updated monthly files for %d months", len(months_to_update))
 
     @staticmethod
     async def _write_updated_monthly_files(monthly_data, months_to_update):
@@ -156,8 +155,7 @@ class FileHandler:
             return []
         except json.JSONDecodeError:
             logger.warning(
-                "File %s is corrupted, initializing with empty features",
-                filename
+                "File %s is corrupted, initializing with empty features", filename
             )
             return []
 

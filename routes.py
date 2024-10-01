@@ -5,8 +5,16 @@ import logging
 from datetime import date, datetime, timezone
 from time import time
 from cachetools import TTLCache
-from quart import (jsonify, redirect, render_template, request,
-                   session, url_for, websocket, make_response)
+from quart import (
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+    websocket,
+    make_response,
+)
 from pydantic import ValidationError
 
 from config import Config
@@ -20,16 +28,16 @@ logger = logging.getLogger(__name__)
 
 
 config = Config(
-    PIN=os.environ.get('PIN', '1234'),  # Default PIN for local development
-    CLIENT_ID=os.environ.get('CLIENT_ID', ''),
-    CLIENT_SECRET=os.environ.get('CLIENT_SECRET', ''),
-    REDIRECT_URI=os.environ.get('REDIRECT_URI', ''),
-    AUTH_CODE=os.environ.get('AUTH_CODE', ''),
-    VEHICLE_ID=os.environ.get('VEHICLE_ID', ''),
-    DEVICE_IMEI=os.environ.get('DEVICE_IMEI', ''),
-    USERNAME=os.environ.get('USERNAME', ''),
-    PASSWORD=os.environ.get('PASSWORD', ''),
-    SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key')  # Default secret key
+    PIN=os.environ.get("PIN", "1234"),  # Default PIN for local development
+    CLIENT_ID=os.environ.get("CLIENT_ID", ""),
+    CLIENT_SECRET=os.environ.get("CLIENT_SECRET", ""),
+    REDIRECT_URI=os.environ.get("REDIRECT_URI", ""),
+    AUTH_CODE=os.environ.get("AUTH_CODE", ""),
+    VEHICLE_ID=os.environ.get("VEHICLE_ID", ""),
+    DEVICE_IMEI=os.environ.get("DEVICE_IMEI", ""),
+    USERNAME=os.environ.get("USERNAME", ""),
+    PASSWORD=os.environ.get("PASSWORD", ""),
+    SECRET_KEY=os.environ.get("SECRET_KEY", "your-secret-key"),  # Default secret key
 )
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
@@ -39,12 +47,13 @@ def no_cache(view_function):
     @wraps(view_function)
     async def no_cache_impl(*args, **kwargs):
         response = await make_response(await view_function(*args, **kwargs))
-        response.headers['Cache-Control'] = (
-            'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, max-age=0"
         )
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '-1'
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "-1"
         return response
+
     return no_cache_impl
 
 
@@ -158,7 +167,8 @@ def register_routes(app):
 
             logger.info(
                 "Fetching Waco streets: boundary=%s, filter=%s",
-                waco_boundary, streets_filter
+                waco_boundary,
+                streets_filter,
             )
             streets_geojson = await geojson_handler.get_waco_streets(
                 waco_boundary, streets_filter
@@ -168,7 +178,7 @@ def register_routes(app):
                 raise ValueError("Invalid GeoJSON: 'features' key not found")
 
             cache[cache_key] = streets_data
-            logger.info("Returning %d street features", len(streets_data['features']))
+            logger.info("Returning %d street features", len(streets_data["features"]))
             return jsonify(streets_data)
         except Exception as e:
             logger.error("Error in get_waco_streets: %s", str(e), exc_info=True)
@@ -215,9 +225,7 @@ def register_routes(app):
             )
             return jsonify(json.loads(untraveled_streets))
         except Exception as e:
-            logger.error(
-                "Error in get_untraveled_streets: %s", str(e), exc_info=True
-            )
+            logger.error("Error in get_untraveled_streets: %s", str(e), exc_info=True)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/latest_bouncie_data")
@@ -337,8 +345,8 @@ def register_routes(app):
                 logger.info("Starting historical data update process")
 
                 data = await request.get_json()
-                start_date = data.get('startDate')
-                end_date = data.get('endDate')
+                start_date = data.get("startDate")
+                end_date = data.get("endDate")
 
                 # Validate start_date and end_date format
                 try:
@@ -347,8 +355,10 @@ def register_routes(app):
                     if end_date:
                         datetime.strptime(end_date, "%Y-%m-%d")
                 except ValueError:
-                    return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), \
-                           400
+                    return (
+                        jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}),
+                        400,
+                    )
 
                 await geojson_handler.update_historical_data(
                     fetch_all=False, start_date=start_date, end_date=end_date
@@ -356,7 +366,7 @@ def register_routes(app):
                 logger.info("Historical data update process completed")
                 return (
                     jsonify({"message": "Historical data updated successfully!"}),
-                    200
+                    200,
                 )
             except Exception as e:
                 logger.error("An error occurred during the update process: %s", e)
@@ -447,13 +457,14 @@ def register_routes(app):
             logger.info(
                 "Fetching historical data for: %s to %s, filterWaco: %s, "
                 "wacoBoundary: %s",
-                start_date, end_date, filter_waco, waco_boundary
+                start_date,
+                end_date,
+                filter_waco,
+                waco_boundary,
             )
             waco_limits = None
             if filter_waco:
-                waco_limits = await geojson_handler.load_waco_boundary(
-                    waco_boundary
-                )
+                waco_limits = await geojson_handler.load_waco_boundary(waco_boundary)
             filtered_features = await geojson_handler.filter_geojson_features(
                 start_date, end_date, filter_waco, waco_limits
             )

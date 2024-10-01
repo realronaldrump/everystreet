@@ -35,7 +35,8 @@ class DataFetcher:
                 data = await response.json()
                 # Validate the structure of the response data
                 if not isinstance(data, list):
-                    logger.error("Invalid data format received from Bouncie API")
+                    logger.error(
+                        "Invalid data format received from Bouncie API")
                     return None
                 return data
             logger.error(
@@ -106,7 +107,8 @@ class DataFetcher:
             # Validate latitude and longitude
             latitude = location.get("lat")
             longitude = location.get("lon")
-            if not isinstance(latitude, (int, float)) or not (-90 <= latitude <= 90):
+            if not isinstance(latitude, (int, float)
+                              ) or not (-90 <= latitude <= 90):
                 raise ValueError("Invalid latitude value")
             if not isinstance(longitude, (int, float)) or not (
                 -180 <= longitude <= 180

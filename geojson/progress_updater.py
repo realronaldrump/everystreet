@@ -27,8 +27,8 @@ class ProgressUpdater:
             total_segments = final_coverage["total_segments"]
 
             logger.info(
-                "Progress updated successfully. Coverage: %.2f%%", coverage_percentage
-            )
+                "Progress updated successfully. Coverage: %.2f%%",
+                coverage_percentage)
             logger.info("Streets: %d / %d", traveled_streets, total_streets)
             logger.info("Segments: %d / %d", traveled_segments, total_segments)
 
@@ -50,6 +50,6 @@ class ProgressUpdater:
             return coverage_analysis
         except Exception as e:
             logger.error(
-                f"Error updating Waco streets progress: {str(e)}", exc_info=True
-            )
+                f"Error updating Waco streets progress: {
+                    str(e)}", exc_info=True)
             return None

@@ -22,7 +22,9 @@ class BouncieAPI:
         self.data_fetcher = DataFetcher(self.client)
         self.geocoder = Geocoder()
         self.trip_processor = TripProcessor()
-        self.live_trip_data = {"last_updated": datetime.now(timezone.utc), "data": []}
+        self.live_trip_data = {
+            "last_updated": datetime.now(
+                timezone.utc), "data": []}
 
     async def get_latest_bouncie_data(self):
         try:
@@ -31,7 +33,8 @@ class BouncieAPI:
 
             # Validate vehicle_data
             if not vehicle_data or "stats" not in vehicle_data:
-                logger.error("No vehicle data or stats found in Bouncie response")
+                logger.error(
+                    "No vehicle data or stats found in Bouncie response")
                 return None
 
             new_data_point = await self.data_fetcher.process_vehicle_data(vehicle_data)
@@ -41,11 +44,13 @@ class BouncieAPI:
                     and self.live_trip_data["data"][-1]["timestamp"]
                     == new_data_point["timestamp"]
                 ):
-                    logger.info("Duplicate timestamp found, not adding new data point.")
+                    logger.info(
+                        "Duplicate timestamp found, not adding new data point.")
                     return None
 
                 self.live_trip_data["data"].append(new_data_point)
-                self.live_trip_data["last_updated"] = datetime.now(timezone.utc)
+                self.live_trip_data["last_updated"] = datetime.now(
+                    timezone.utc)
                 return new_data_point
 
             return None

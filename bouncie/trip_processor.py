@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 class TripProcessor:
     @staticmethod
     def calculate_metrics(live_trip_data):
-        time_since_update = datetime.now(timezone.utc) - live_trip_data["last_updated"]
+        time_since_update = datetime.now(
+            timezone.utc) - live_trip_data["last_updated"]
         if time_since_update.total_seconds() > 45:
             live_trip_data["data"] = []
 
@@ -82,11 +83,11 @@ class TripProcessor:
                     if (
                         path_array.shape[1] >= 5
                     ):  # Check for lat, lon, timestamp at least
-                        for lat, lon, _, _, timestamp in path_array[:, [0, 1, 2, 3, 4]]:
+                        for lat, lon, _, _, timestamp in path_array[:, [
+                                0, 1, 2, 3, 4]]:
                             if timestamp is None:
                                 logger.warning(
-                                    "Skipping point with None timestamp: %s", path
-                                )
+                                    "Skipping point with None timestamp: %s", path)
                                 continue
 
                             try:
@@ -97,10 +98,7 @@ class TripProcessor:
                                 timestamps.append(iso_timestamp)
                             except (TypeError, ValueError) as e:
                                 logger.error(
-                                    "Invalid timestamp %s: %s. Skipping point.",
-                                    timestamp,
-                                    str(e),
-                                )
+                                    "Invalid timestamp %s: %s. Skipping point.", timestamp, str(e), )
                     else:
                         logger.warning("Skipping invalid path: %s", path)
 
@@ -122,5 +120,7 @@ class TripProcessor:
                     len(timestamps),
                 )
 
-        logger.info("Created %d GeoJSON features from trip data", len(features))
+        logger.info(
+            "Created %d GeoJSON features from trip data",
+            len(features))
         return features

@@ -23,7 +23,11 @@ def log_method(func):
             logger.info("Finished %s", func.__name__)
             return result
         except Exception as e:
-            logger.error("Error in %s: %s", func.__name__, str(e), exc_info=True)
+            logger.error(
+                "Error in %s: %s",
+                func.__name__,
+                str(e),
+                exc_info=True)
             raise
 
     return wrapper
@@ -101,8 +105,9 @@ class DataProcessor:
                 logger.info("Fetching trips for %s", date.strftime("%Y-%m-%d"))
                 trips = await self.bouncie_api.fetch_trip_data(date, date)
                 logger.info(
-                    "Fetched %d trips for %s", len(trips), date.strftime("%Y-%m-%d")
-                )
+                    "Fetched %d trips for %s",
+                    len(trips),
+                    date.strftime("%Y-%m-%d"))
                 return date, trips
             except Exception as e:
                 logger.error("Error fetching data for %s: %s", date, str(e))
@@ -114,10 +119,12 @@ class DataProcessor:
                 logger.info("No trips found for %s", date.strftime("%Y-%m-%d"))
                 continue
 
-            new_features = self.bouncie_api.create_geojson_features_from_trips(trips)
+            new_features = self.bouncie_api.create_geojson_features_from_trips(
+                trips)
             logger.info(
-                "Created %d new features from trips on %s", len(new_features), date
-            )
+                "Created %d new features from trips on %s",
+                len(new_features),
+                date)
 
             if not new_features:
                 continue
@@ -136,8 +143,7 @@ class DataProcessor:
             await self.file_handler.update_monthly_files(handler, unique_new_features)
             handler.historical_geojson_features.extend(unique_new_features)
             handler.fetched_trip_timestamps.update(
-                feature["properties"]["timestamp"] for feature in unique_new_features
-            )
+                feature["properties"]["timestamp"] for feature in unique_new_features)
             logger.info(
                 "Added %d new unique features to historical_geojson_features",
                 len(unique_new_features),
@@ -146,8 +152,10 @@ class DataProcessor:
     @log_method
     async def process_routes_and_update_progress(self, handler):
         batch_size = 1000
-        for i in range(0, len(handler.historical_geojson_features), batch_size):
-            batch = handler.historical_geojson_features[i : i + batch_size]
+        for i in range(0,
+                       len(handler.historical_geojson_features),
+                       batch_size):
+            batch = handler.historical_geojson_features[i: i + batch_size]
             await self.waco_analyzer.update_progress(batch)
 
         progress = self.waco_analyzer.calculate_progress()
@@ -169,7 +177,8 @@ class DataProcessor:
         )
 
         if not handler.monthly_data:
-            logger.warning("No historical data loaded yet. Returning empty features.")
+            logger.warning(
+                "No historical data loaded yet. Returning empty features.")
             return []
 
         filtered_features = []
@@ -198,11 +207,13 @@ class DataProcessor:
 
             try:
                 month_features = gpd.GeoDataFrame.from_features(valid_features)
-                month_features = month_features.set_crs(epsg=4326, allow_override=True)
+                month_features = month_features.set_crs(
+                    epsg=4326, allow_override=True)
             except Exception as e:
                 logger.error(
-                    "Error creating GeoDataFrame for %s: %s", month_year, str(e)
-                )
+                    "Error creating GeoDataFrame for %s: %s",
+                    month_year,
+                    str(e))
                 continue
 
             if "timestamp" in month_features.columns:
@@ -229,7 +240,8 @@ class DataProcessor:
             filtered_month_features = month_features[mask]
 
             if filter_waco and waco_limits is not None:
-                filtered_month_features = gpd.clip(filtered_month_features, waco_limits)
+                filtered_month_features = gpd.clip(
+                    filtered_month_features, waco_limits)
 
             for _, row in filtered_month_features.iterrows():
                 feature = {
@@ -260,8 +272,11 @@ class DataProcessor:
         ):
             logger.warning("Invalid GeoJSON feature: %s", feature)
             return False
-        if feature["geometry"]["type"] not in ["LineString", "MultiLineString"]:
-            logger.warning("Unsupported geometry type: %s", feature["geometry"]["type"])
+        if feature["geometry"]["type"] not in [
+                "LineString", "MultiLineString"]:
+            logger.warning(
+                "Unsupported geometry type: %s",
+                feature["geometry"]["type"])
             return False
         if not isinstance(feature["geometry"]["coordinates"], list):
             logger.warning(

@@ -18,7 +18,8 @@ class DataLoader:
                 return {
                     "historical_geojson_features": handler.historical_geojson_features,
                     "monthly_data": handler.monthly_data,
-                    "total_features": len(handler.historical_geojson_features),
+                    "total_features": len(
+                        handler.historical_geojson_features),
                 }
 
             try:
@@ -36,7 +37,8 @@ class DataLoader:
                                 file, handler.fetched_trip_timestamps
                             )
 
-                            handler.historical_geojson_features.extend(month_features)
+                            handler.historical_geojson_features.extend(
+                                month_features)
                             handler.monthly_data[month_year] = month_features
                             total_features += len(month_features)
 
@@ -49,8 +51,8 @@ class DataLoader:
                             )
 
                     logger.info(
-                        f"Loaded {total_features} features from {len(monthly_files)} monthly files"
-                    )
+                        f"Loaded {total_features} features from {
+                            len(monthly_files)} monthly files")
 
                 await handler.update_all_progress()
 
@@ -62,8 +64,8 @@ class DataLoader:
 
             except Exception as e:
                 logger.error(
-                    f"Unexpected error loading historical data: {str(e)}", exc_info=True
-                )
+                    f"Unexpected error loading historical data: {
+                        str(e)}", exc_info=True)
                 raise
 
     @staticmethod

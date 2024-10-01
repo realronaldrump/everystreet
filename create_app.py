@@ -29,7 +29,8 @@ async def create_app():
     app = cors(Quart(__name__))
     config = Config()
 
-    app.config.from_mapping({k: v for k, v in config.dict().items() if k != "Config"})
+    app.config.from_mapping(
+        {k: v for k, v in config.dict().items() if k != "Config"})
     app.secret_key = config.SECRET_KEY
     app.config["SESSION_TYPE"] = "filesystem"
 
@@ -64,7 +65,8 @@ async def create_app():
     logger.info("WacoStreetsAnalyzer initialized successfully")
 
     # Initialize GeoJSONHandler (Pass the single BouncieAPI instance)
-    app.geojson_handler = GeoJSONHandler(app.waco_streets_analyzer, app.bouncie_api)
+    app.geojson_handler = GeoJSONHandler(
+        app.waco_streets_analyzer, app.bouncie_api)
     await app.geojson_handler.load_historical_data()
     logger.info("GeoJSONHandler initialized successfully")
 

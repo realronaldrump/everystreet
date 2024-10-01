@@ -47,13 +47,13 @@ class FileHandler:
                 continue
             if feature["geometry"]["type"] != "LineString":
                 logger.warning(
-                    "Unsupported geometry type: %s", feature["geometry"]["type"]
-                )
+                    "Unsupported geometry type: %s",
+                    feature["geometry"]["type"])
                 continue
             if not isinstance(feature["geometry"]["coordinates"], list):
                 logger.warning(
-                    "Invalid coordinates: %s", feature["geometry"]["coordinates"]
-                )
+                    "Invalid coordinates: %s",
+                    feature["geometry"]["coordinates"])
                 continue
             # Validate coordinates
             for coord in feature["geometry"]["coordinates"]:
@@ -62,21 +62,20 @@ class FileHandler:
                     or len(coord) != 2
                     or not all(isinstance(c, (int, float)) for c in coord)
                 ):
-                    logger.warning("Invalid coordinates in feature: %s", feature)
+                    logger.warning(
+                        "Invalid coordinates in feature: %s", feature)
                     continue
 
             feature["geometry"]["coordinates"] = FileHandler._convert_ndarray_to_list(
-                feature["geometry"]["coordinates"]
-            )
+                feature["geometry"]["coordinates"])
             timestamp = FileHandler._parse_timestamp(
                 feature["properties"].get("timestamp")
             )
             if timestamp is None:
                 continue
 
-            month_year = datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime(
-                "%Y-%m"
-            )
+            month_year = datetime.fromtimestamp(
+                timestamp, tz=timezone.utc).strftime("%Y-%m")
 
             if month_year not in handler.monthly_data:
                 handler.monthly_data[month_year] = []
@@ -92,7 +91,9 @@ class FileHandler:
             await FileHandler._write_updated_monthly_files(
                 handler.monthly_data, months_to_update
             )
-            logger.info("Updated monthly files for %d months", len(months_to_update))
+            logger.info(
+                "Updated monthly files for %d months",
+                len(months_to_update))
 
     @staticmethod
     async def _write_updated_monthly_files(monthly_data, months_to_update):
@@ -124,11 +125,13 @@ class FileHandler:
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             existing_features = await FileHandler._load_existing_features(filename)
 
-            all_features = FileHandler._merge_features(existing_features, features)
+            all_features = FileHandler._merge_features(
+                existing_features, features)
             await FileHandler._write_geojson_file(filename, all_features)
             logger.info(
-                "Successfully wrote %d features to %s", len(all_features), filename
-            )
+                "Successfully wrote %d features to %s",
+                len(all_features),
+                filename)
         except Exception as e:
             logger.error(
                 "Error writing to file %s: %s", filename, str(e), exc_info=True
@@ -155,8 +158,8 @@ class FileHandler:
             return []
         except json.JSONDecodeError:
             logger.warning(
-                "File %s is corrupted, initializing with empty features", filename
-            )
+                "File %s is corrupted, initializing with empty features",
+                filename)
             return []
 
     @staticmethod
@@ -206,7 +209,8 @@ class FileHandler:
         Returns:
             list: Merged list of features.
         """
-        existing_timestamps = {f["properties"]["timestamp"] for f in existing_features}
+        existing_timestamps = {f["properties"]["timestamp"]
+                               for f in existing_features}
         merged_features = existing_features.copy()
 
         for new_feature in new_features:

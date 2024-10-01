@@ -12,7 +12,8 @@ class Geocoder:
     async def reverse_geocode(self, lat, lon, retries=3):
         for attempt in range(retries):
             try:
-                location = self.geolocator.reverse((lat, lon), addressdetails=True)
+                location = self.geolocator.reverse(
+                    (lat, lon), addressdetails=True)
                 if location:
                     address = location.raw["address"]
                     formatted_address = f"{address.get('place', '')}<br>"
@@ -31,8 +32,9 @@ class Geocoder:
                 return "N/A"
             except Exception as e:
                 logger.error(
-                    "Reverse geocoding attempt %d failed with error: %s", attempt + 1, e
-                )
+                    "Reverse geocoding attempt %d failed with error: %s",
+                    attempt + 1,
+                    e)
                 if attempt < retries - 1:
                     await asyncio.sleep(1)
         return "N/A"

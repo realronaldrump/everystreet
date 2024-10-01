@@ -30,11 +30,14 @@ async def poll_bouncie_api(app, bouncie_api):
 
                     live_route_feature = app.live_route_data["features"][0]
 
-                    new_coord = [bouncie_data["longitude"], bouncie_data["latitude"]]
+                    new_coord = [
+                        bouncie_data["longitude"],
+                        bouncie_data["latitude"]]
 
                     # Validate coordinates
                     if not isinstance(new_coord, list) or len(new_coord) != 2:
-                        logger.error("Invalid coordinates received from Bouncie API")
+                        logger.error(
+                            "Invalid coordinates received from Bouncie API")
                         continue
                     if not all(isinstance(c, (int, float)) for c in new_coord):
                         logger.error(
@@ -47,7 +50,8 @@ async def poll_bouncie_api(app, bouncie_api):
                         or new_coord
                         != live_route_feature["geometry"]["coordinates"][-1]
                     ):
-                        live_route_feature["geometry"]["coordinates"].append(new_coord)
+                        live_route_feature["geometry"]["coordinates"].append(
+                            new_coord)
                         save_live_route_data(app.live_route_data)
                         app.latest_bouncie_data = bouncie_data
                     else:
@@ -71,7 +75,10 @@ async def load_historical_data_background(app, geojson_handler):
             app.historical_data_loaded = True
         logger.info("Historical data loaded successfully")
     except Exception as e:
-        logger.error("Error loading historical data: %s", str(e), exc_info=True)
+        logger.error(
+            "Error loading historical data: %s",
+            str(e),
+            exc_info=True)
     finally:
         async with app.historical_data_lock:
             app.historical_data_loading = False

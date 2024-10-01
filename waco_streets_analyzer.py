@@ -28,7 +28,8 @@ class WacoStreetsAnalyzer:
         try:
             await self.load_data()
             if self.streets_gdf is None or self.streets_gdf.empty:
-                raise ValueError("streets_gdf is None or empty after load_data")
+                raise ValueError(
+                    "streets_gdf is None or empty after load_data")
             self.sindex = self.segments_gdf.sindex
             logger.info(
                 "WacoStreetsAnalyzer initialized. Total streets: %s, "
@@ -37,7 +38,9 @@ class WacoStreetsAnalyzer:
                 len(self.segments_gdf),
             )
         except Exception as e:
-            logger.error("Error during WacoStreetsAnalyzer initialization: %s", str(e))
+            logger.error(
+                "Error during WacoStreetsAnalyzer initialization: %s",
+                str(e))
             raise
 
     async def load_data(self):
@@ -66,7 +69,8 @@ class WacoStreetsAnalyzer:
             self.traveled_segments = set(cache_dict["traveled_segments"])
 
             # Ensure CRS is set for both GeoDataFrames
-            self.streets_gdf = self.streets_gdf.set_crs(epsg=4326, allow_override=True)
+            self.streets_gdf = self.streets_gdf.set_crs(
+                epsg=4326, allow_override=True)
             self.segments_gdf = self.segments_gdf.set_crs(
                 epsg=4326, allow_override=True
             )
@@ -80,10 +84,9 @@ class WacoStreetsAnalyzer:
                 raise ValueError("Invalid data loaded from cache")
 
             logger.info(
-                "Loaded data from cache. Total streets: %s, Total segments: %s",
-                len(self.streets_gdf),
-                len(self.segments_gdf),
-            )
+                "Loaded data from cache. Total streets: %s, Total segments: %s", len(
+                    self.streets_gdf), len(
+                    self.segments_gdf), )
         except Exception as e:
             logger.error("Error loading from cache: %s", str(e))
             await self._process_and_cache_data()
@@ -91,13 +94,15 @@ class WacoStreetsAnalyzer:
     async def _process_and_cache_data(self):
         try:
             self.streets_gdf = gpd.read_file(self.streets_geojson_path)
-            self.streets_gdf = self.streets_gdf.set_crs(epsg=4326, allow_override=True)
+            self.streets_gdf = self.streets_gdf.set_crs(
+                epsg=4326, allow_override=True)
             if self.streets_gdf is None or self.streets_gdf.empty:
                 raise ValueError(
                     f"Failed to load GeoJSON from {self.streets_geojson_path}"
                 )
             if "street_id" not in self.streets_gdf.columns:
-                self.streets_gdf["street_id"] = self.streets_gdf.index.astype(str)
+                self.streets_gdf["street_id"] = self.streets_gdf.index.astype(
+                    str)
             self.streets_gdf = self.streets_gdf.to_crs(epsg=4326)
             self.streets_gdf = self.streets_gdf.set_index(
                 "street_id", drop=False
@@ -175,7 +180,8 @@ class WacoStreetsAnalyzer:
                     or len(coord) != 2
                     or not all(isinstance(c, (int, float)) for c in coord)
                 ):
-                    logger.warning("Invalid coordinates in feature: %s", feature)
+                    logger.warning(
+                        "Invalid coordinates in feature: %s", feature)
                     continue
             valid_features.append(feature)
 
@@ -185,7 +191,7 @@ class WacoStreetsAnalyzer:
         try:
             batch_size = 10000
             for i in range(0, len(valid_features), batch_size):
-                batch = valid_features[i : i + batch_size]
+                batch = valid_features[i: i + batch_size]
                 gdf = gpd.GeoDataFrame.from_features(batch, crs="EPSG:4326")
 
                 # Ensure both GeoDataFrames have the same CRS
@@ -205,7 +211,8 @@ class WacoStreetsAnalyzer:
                     )
                 ]
 
-                self.traveled_segments.update(close_segments["segment_id"].tolist())
+                self.traveled_segments.update(
+                    close_segments["segment_id"].tolist())
 
                 logger.info(
                     "Batch processed. Total traveled segments: %s",
@@ -239,8 +246,9 @@ class WacoStreetsAnalyzer:
             )
         )
         coverage_percentage = (
-            (traveled_segments / total_segments) * 100 if total_segments > 0 else 0
-        )
+            (traveled_segments /
+             total_segments) *
+            100 if total_segments > 0 else 0)
         return {
             "coverage_percentage": coverage_percentage,
             "total_streets": total_streets,
@@ -257,7 +265,8 @@ class WacoStreetsAnalyzer:
     async def get_progress_geojson(self, waco_boundary="city_limits"):
         logger.info("Generating progress GeoJSON...")
         if self.segments_gdf is None:
-            logger.error("segments_gdf is None. Unable to generate progress GeoJSON.")
+            logger.error(
+                "segments_gdf is None. Unable to generate progress GeoJSON.")
             return {"type": "FeatureCollection", "features": []}
         waco_limits = None
         if waco_boundary != "none":
@@ -299,7 +308,8 @@ class WacoStreetsAnalyzer:
             return "{}"
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson")
+            waco_limits = gpd.read_file(
+                f"static/boundaries/{waco_boundary}.geojson")
             waco_limits = waco_limits.geometry.unary_union
         traveled_streets = set(
             self.segments_gdf[
@@ -324,22 +334,27 @@ class WacoStreetsAnalyzer:
             return None
         waco_limits = None
         if waco_boundary != "none":
-            waco_limits = gpd.read_file(f"static/boundaries/{waco_boundary}.geojson")
+            waco_limits = gpd.read_file(
+                f"static/boundaries/{waco_boundary}.geojson")
             waco_limits = waco_limits.geometry.unary_union
         street_network = self.streets_gdf.copy()
         if waco_limits is not None:
-            street_network = street_network[street_network.intersects(waco_limits)]
+            street_network = street_network[street_network.intersects(
+                waco_limits)]
         traveled_streets = set(
             self.segments_gdf[
                 self.segments_gdf["segment_id"].isin(self.traveled_segments)
             ]["street_id"]
         )
-        street_network["traveled"] = street_network["street_id"].isin(traveled_streets)
+        street_network["traveled"] = street_network["street_id"].isin(
+            traveled_streets)
         return street_network
 
     def get_all_streets(self):
         if self.streets_gdf is None:
             logger.error("streets_gdf is None. Unable to get all streets.")
             return None
-        logger.info("Retrieving all streets. Total streets: %d", len(self.streets_gdf))
+        logger.info(
+            "Retrieving all streets. Total streets: %d", len(
+                self.streets_gdf))
         return self.streets_gdf

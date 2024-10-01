@@ -37,7 +37,10 @@ config = Config(
     DEVICE_IMEI=os.environ.get("DEVICE_IMEI", ""),
     USERNAME=os.environ.get("USERNAME", ""),
     PASSWORD=os.environ.get("PASSWORD", ""),
-    SECRET_KEY=os.environ.get("SECRET_KEY", "your-secret-key"),  # Default secret key
+    SECRET_KEY=os.environ.get(
+        "SECRET_KEY",
+        "your-secret-key"),
+    # Default secret key
 )
 
 cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
@@ -72,15 +75,15 @@ def register_routes(app):
                 logger.info("Progress update: %s", coverage_analysis)
                 return jsonify(
                     {
-                        "total_streets": int(coverage_analysis["total_streets"]),
-                        "traveled_streets": int(coverage_analysis["traveled_streets"]),
-                        "coverage_percentage": float(
-                            coverage_analysis["coverage_percentage"]
-                        ),
-                    }
-                )
+                        "total_streets": int(
+                            coverage_analysis["total_streets"]), "traveled_streets": int(
+                            coverage_analysis["traveled_streets"]), "coverage_percentage": float(
+                            coverage_analysis["coverage_percentage"]), })
             except Exception as e:
-                logger.error("Error in get_progress: %s", str(e), exc_info=True)
+                logger.error(
+                    "Error in get_progress: %s",
+                    str(e),
+                    exc_info=True)
                 return jsonify({"error": str(e)}), 500
 
     @app.route("/filtered_historical_data")
@@ -100,10 +103,13 @@ def register_routes(app):
                     else None
                 ),
             )
-            logger.info("Received request for filtered historical data: %s", params)
+            logger.info(
+                "Received request for filtered historical data: %s",
+                params)
 
             # Validate wacoBoundary against allowed values
-            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            allowed_waco_boundaries = [
+                "city_limits", "less_goofy", "goofy", "none"]
             if params.waco_boundary not in allowed_waco_boundaries:
                 raise ValueError(
                     f"Invalid wacoBoundary: {params.waco_boundary}. "
@@ -135,8 +141,12 @@ def register_routes(app):
             logger.error("Error parsing parameters: %s", str(e))
             return jsonify({"error": f"Invalid parameter: {str(e)}"}), 400
         except Exception as e:
-            logger.error("Error filtering historical data: %s", str(e), exc_info=True)
-            return jsonify({"error": f"Error filtering historical data: {str(e)}"}), 500
+            logger.error(
+                "Error filtering historical data: %s",
+                str(e),
+                exc_info=True)
+            return jsonify(
+                {"error": f"Error filtering historical data: {str(e)}"}), 500
 
     @app.route("/waco_streets")
     async def get_waco_streets():
@@ -145,7 +155,8 @@ def register_routes(app):
             streets_filter = request.args.get("filter", "all")
 
             # Validate wacoBoundary and streetsFilter against allowed values
-            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            allowed_waco_boundaries = [
+                "city_limits", "less_goofy", "goofy", "none"]
             allowed_streets_filters = ["all", "traveled", "untraveled"]
 
             if waco_boundary not in allowed_waco_boundaries:
@@ -178,10 +189,15 @@ def register_routes(app):
                 raise ValueError("Invalid GeoJSON: 'features' key not found")
 
             cache[cache_key] = streets_data
-            logger.info("Returning %d street features", len(streets_data["features"]))
+            logger.info(
+                "Returning %d street features", len(
+                    streets_data["features"]))
             return jsonify(streets_data)
         except Exception as e:
-            logger.error("Error in get_waco_streets: %s", str(e), exc_info=True)
+            logger.error(
+                "Error in get_waco_streets: %s",
+                str(e),
+                exc_info=True)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/update_progress", methods=["POST"])
@@ -204,8 +220,12 @@ def register_routes(app):
                     200,
                 )
             except Exception as e:
-                logger.error("Error updating progress: %s", str(e), exc_info=True)
-                return jsonify({"error": f"Error updating progress: {str(e)}"}), 500
+                logger.error(
+                    "Error updating progress: %s",
+                    str(e),
+                    exc_info=True)
+                return jsonify(
+                    {"error": f"Error updating progress: {str(e)}"}), 500
 
     @app.route("/untraveled_streets")
     async def get_untraveled_streets():
@@ -213,7 +233,8 @@ def register_routes(app):
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
 
             # Validate wacoBoundary against allowed values
-            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            allowed_waco_boundaries = [
+                "city_limits", "less_goofy", "goofy", "none"]
             if waco_boundary not in allowed_waco_boundaries:
                 raise ValueError(
                     f"Invalid wacoBoundary: {waco_boundary}. "
@@ -225,7 +246,10 @@ def register_routes(app):
             )
             return jsonify(json.loads(untraveled_streets))
         except Exception as e:
-            logger.error("Error in get_untraveled_streets: %s", str(e), exc_info=True)
+            logger.error(
+                "Error in get_untraveled_streets: %s",
+                str(e),
+                exc_info=True)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/latest_bouncie_data")
@@ -255,7 +279,8 @@ def register_routes(app):
                     # Update the last_sent_time to the current time
                     last_sent_time = current_time
 
-                # Wait a small amount of time before the next check, e.g., 1 second
+                # Wait a small amount of time before the next check, e.g., 1
+                # second
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
             # Handle WebSocket disconnection
@@ -286,13 +311,15 @@ def register_routes(app):
                     async with app.live_route_lock:
                         formatted_metrics = await app.bouncie_api.get_trip_metrics()
 
-                    # Send the trip metrics to the client over the WebSocket connection
+                    # Send the trip metrics to the client over the WebSocket
+                    # connection
                     await websocket.send(json.dumps(formatted_metrics))
 
                     # Update the last_sent_time to the current time
                     last_sent_time = current_time
 
-                # Wait a small amount of time before the next check, e.g., 1 second
+                # Wait a small amount of time before the next check, e.g., 1
+                # second
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
             # Handle WebSocket disconnection
@@ -316,7 +343,8 @@ def register_routes(app):
             return jsonify({"error": "Location not found"}), 404
         except Exception as e:
             logger.error("Error during location search: %s", e)
-            return jsonify({"error": "An error occurred during the search"}), 500
+            return jsonify(
+                {"error": "An error occurred during the search"}), 500
 
     @app.route("/search_suggestions")
     async def search_suggestions():
@@ -328,18 +356,21 @@ def register_routes(app):
                 geolocator.geocode, query, exactly_one=False, limit=5
             )
             if locations:
-                suggestions = [{"address": location.address} for location in locations]
+                suggestions = [{"address": location.address}
+                               for location in locations]
                 return jsonify(suggestions)
             return jsonify([])
         except Exception as e:
             logger.error("Error during location search: %s", e)
-            return jsonify({"error": "An error occurred during the search"}), 500
+            return jsonify(
+                {"error": "An error occurred during the search"}), 500
 
     @app.route("/update_historical_data", methods=["POST"])
     async def update_historical_data():
         async with app.processing_lock:
             if app.is_processing:
-                return jsonify({"error": "Another process is already running"}), 429
+                return jsonify(
+                    {"error": "Another process is already running"}), 429
             try:
                 app.is_processing = True
                 logger.info("Starting historical data update process")
@@ -369,7 +400,8 @@ def register_routes(app):
                     200,
                 )
             except Exception as e:
-                logger.error("An error occurred during the update process: %s", e)
+                logger.error(
+                    "An error occurred during the update process: %s", e)
                 return jsonify({"error": f"An error occurred: {str(e)}"}), 500
             finally:
                 app.is_processing = False
@@ -380,7 +412,8 @@ def register_routes(app):
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
 
             # Validate wacoBoundary against allowed values
-            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            allowed_waco_boundaries = [
+                "city_limits", "less_goofy", "goofy", "none"]
             if waco_boundary not in allowed_waco_boundaries:
                 raise ValueError(
                     f"Invalid wacoBoundary: {waco_boundary}. "
@@ -390,8 +423,12 @@ def register_routes(app):
             progress_geojson = await geojson_handler.get_progress_geojson(waco_boundary)
             return jsonify(progress_geojson)
         except Exception as e:
-            logger.error("Error getting progress GeoJSON: %s", str(e), exc_info=True)
-            return jsonify({"error": f"Error getting progress GeoJSON: {str(e)}"}), 500
+            logger.error(
+                "Error getting progress GeoJSON: %s",
+                str(e),
+                exc_info=True)
+            return jsonify(
+                {"error": f"Error getting progress GeoJSON: {str(e)}"}), 500
 
     @app.route("/processing_status")
     async def processing_status():
@@ -403,7 +440,8 @@ def register_routes(app):
     async def reset_progress():
         async with app.processing_lock:
             if app.is_processing:
-                return jsonify({"error": "Another process is already running"}), 429
+                return jsonify(
+                    {"error": "Another process is already running"}), 429
             try:
                 app.is_processing = True
                 logger.info("Starting progress reset process")
@@ -423,8 +461,7 @@ def register_routes(app):
                 )
             except Exception as e:
                 logger.error(
-                    "An error occurred during the progress reset process: %s", e
-                )
+                    "An error occurred during the progress reset process: %s", e)
                 return jsonify({"error": f"An error occurred: {str(e)}"}), 500
             finally:
                 app.is_processing = False
@@ -434,7 +471,8 @@ def register_routes(app):
         try:
             start_date = request.args.get("startDate")
             end_date = request.args.get("endDate")
-            filter_waco = request.args.get("filterWaco", "false").lower() == "true"
+            filter_waco = request.args.get(
+                "filterWaco", "false").lower() == "true"
             waco_boundary = request.args.get("wacoBoundary", "city_limits")
 
             # Validate start_date and end_date format
@@ -444,10 +482,12 @@ def register_routes(app):
                 if end_date:
                     datetime.strptime(end_date, "%Y-%m-%d")
             except ValueError:
-                return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+                return jsonify(
+                    {"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
             # Validate wacoBoundary against allowed values
-            allowed_waco_boundaries = ["city_limits", "less_goofy", "goofy", "none"]
+            allowed_waco_boundaries = [
+                "city_limits", "less_goofy", "goofy", "none"]
             if waco_boundary not in allowed_waco_boundaries:
                 raise ValueError(
                     f"Invalid wacoBoundary: {waco_boundary}. "
@@ -468,9 +508,13 @@ def register_routes(app):
             filtered_features = await geojson_handler.filter_geojson_features(
                 start_date, end_date, filter_waco, waco_limits
             )
-            return jsonify({"type": "FeatureCollection", "features": filtered_features})
+            return jsonify({"type": "FeatureCollection",
+                           "features": filtered_features})
         except Exception as e:
-            logger.error("Error fetching historical data: %s", str(e), exc_info=True)
+            logger.error(
+                "Error fetching historical data: %s",
+                str(e),
+                exc_info=True)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/live_data")
@@ -503,9 +547,12 @@ def register_routes(app):
     async def index():
         today = datetime.now().strftime("%Y-%m-%d")
         # Calculate the start date for the last month
-        last_month_start = (date.today().replace(day=1) - timedelta(days=1)).replace(
-            day=1
-        )
+        last_month_start = (
+            date.today().replace(
+                day=1) -
+            timedelta(
+                days=1)).replace(
+            day=1)
         async with app.historical_data_lock:
             return await render_template(
                 "index.html",
@@ -547,7 +594,8 @@ def register_routes(app):
                 and geojson_handler.bouncie_api.client.client_session
             ):
                 await geojson_handler.bouncie_api.client.client_session.close()
-                logger.info("GeoJSON handler Bouncie API client session closed")
+                logger.info(
+                    "GeoJSON handler Bouncie API client session closed")
         except Exception as e:
             logger.error("Error during shutdown: %s", str(e), exc_info=True)
         finally:

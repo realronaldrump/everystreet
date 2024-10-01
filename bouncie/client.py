@@ -7,8 +7,13 @@ logger = logging.getLogger(__name__)
 
 class BouncieClient:
     def __init__(
-        self, client_id, client_secret, redirect_uri, auth_code, device_imei, vehicle_id
-    ):
+            self,
+            client_id,
+            client_secret,
+            redirect_uri,
+            auth_code,
+            device_imei,
+            vehicle_id):
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
@@ -26,7 +31,8 @@ class BouncieClient:
                 self.device_imei,
             ]
         ):
-            raise ValueError("Missing required environment variables for BouncieAPI")
+            raise ValueError(
+                "Missing required environment variables for BouncieAPI")
 
         self.client = AsyncRESTAPIClient(
             client_id=self.client_id,

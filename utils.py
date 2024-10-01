@@ -21,13 +21,14 @@ def load_live_route_data():
 
             # Ensure 'crs' is in the loaded data
             if "crs" not in data:
-                data["crs"] = {"type": "name", "properties": {"name": "EPSG:4326"}}
+                data["crs"] = {
+                    "type": "name", "properties": {
+                        "name": "EPSG:4326"}}
 
             return data
     except FileNotFoundError:
         logger.warning(
-            f"File not found: {LIVE_ROUTE_DATA_FILE}. Creating an empty GeoJSON."
-        )
+            f"File not found: {LIVE_ROUTE_DATA_FILE}. Creating an empty GeoJSON.")
         # Default GeoJSON structure with CRS
         empty_geojson = {
             "type": "FeatureCollection",
@@ -38,8 +39,7 @@ def load_live_route_data():
         return empty_geojson
     except json.JSONDecodeError:
         logger.error(
-            f"Error decoding JSON from {LIVE_ROUTE_DATA_FILE}. File may be corrupted."
-        )
+            f"Error decoding JSON from {LIVE_ROUTE_DATA_FILE}. File may be corrupted.")
         return {
             "type": "FeatureCollection",
             "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},

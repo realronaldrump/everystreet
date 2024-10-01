@@ -1,5 +1,6 @@
 import logging
 import aiohttp
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,13 @@ class BouncieClient:
                 "Missing required environment variables for BouncieAPI")
 
     async def get_access_token(self):
-        if self.access_token:
+        current_time = time.time()
+
+        # Check if token exists and has not expired
+        if self.access_token and current_time < self.token_expiry:
             return self.access_token
 
+        # Fetch a new token
         auth_url = "https://auth.bouncie.com/oauth/token"
         payload = {
             "client_id": self.client_id,
@@ -52,6 +57,8 @@ class BouncieClient:
                     if response.status == 200:
                         data = await response.json()
                         self.access_token = data.get('access_token')
+                        expires_in = data.get('expires_in', 3600)  # Default to 1 hour
+                        self.token_expiry = current_time + expires_in
                         return self.access_token
                     else:
                         logger.error(f"Failed to obtain access token. Status: {response.status}")

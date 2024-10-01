@@ -95,10 +95,12 @@ def register_routes(app):
                     end_date=request.args.get("endDate")
                     or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 ),
-                filter_waco=request.args.get("filterWaco", "false").lower() == "true",
+                filter_waco=request.args.get(
+                    "filterWaco", "false").lower() == "true",
                 waco_boundary=request.args.get("wacoBoundary", "city_limits"),
                 bounds=(
-                    [float(x) for x in request.args.get("bounds", "").split(",")]
+                    [float(x)
+                     for x in request.args.get("bounds", "").split(",")]
                     if request.args.get("bounds")
                     else None
                 ),
@@ -387,7 +389,8 @@ def register_routes(app):
                         datetime.strptime(end_date, "%Y-%m-%d")
                 except ValueError:
                     return (
-                        jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}),
+                        jsonify(
+                            {"error": "Invalid date format. Use YYYY-MM-DD."}),
                         400,
                     )
 

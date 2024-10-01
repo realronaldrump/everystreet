@@ -94,7 +94,8 @@ class DataProcessor:
     @staticmethod
     def _get_end_date(end_date):
         return (
-            datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            datetime.strptime(end_date,
+                              "%Y-%m-%d").replace(tzinfo=timezone.utc)
             if end_date
             else datetime.now(tz=timezone.utc)
         )

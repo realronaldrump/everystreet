@@ -4,147 +4,148 @@
 #
 #    pip-compile requirements.in
 #
-aiofiles==24.1.0
+aiofiles
     # via
     #   -r requirements.in
     #   quart
-aiohappyeyeballs==2.4.0
+aiohappyeyeballs
     # via aiohttp
-aiohttp==3.10.5
+aiohttp
     # via
     #   -r requirements.in
     #   bounciepy
-aiosignal==1.3.1
+aiosignal
     # via aiohttp
-annotated-types==0.7.0
+annotated-types
     # via pydantic
-attrs==24.2.0
+attrs
     # via aiohttp
-blinker==1.8.2
+blinker
     # via
     #   flask
     #   quart
-bounciepy==0.3.0
+bounciepy
     # via -r requirements.in
-cachetools==5.5.0
+cachetools
     # via -r requirements.in
-certifi==2024.8.30
+certifi
     # via
     #   pyogrio
     #   pyproj
-click==8.1.7
+click
     # via
     #   flask
     #   quart
-flask==3.0.3
+flask
     # via quart
-frozenlist==1.4.1
+frozenlist
     # via
     #   aiohttp
     #   aiosignal
-geographiclib==2.0
+geographiclib
     # via geopy
-geopandas==1.0.1
+geopandas
     # via -r requirements.in
-geopy==2.4.1
+geopy
     # via -r requirements.in
-h11==0.14.0
+h11
     # via
     #   hypercorn
     #   wsproto
-h2==4.1.0
+h2
     # via hypercorn
-hpack==4.0.0
+hpack
     # via h2
-hypercorn==0.17.3
+hypercorn
     # via
     #   -r requirements.in
     #   quart
-hyperframe==6.0.1
+hyperframe
     # via h2
-idna==3.10
+idna
     # via yarl
-itsdangerous==2.2.0
+itsdangerous
     # via
     #   flask
     #   quart
-jinja2==3.1.4
+jinja2
     # via
     #   flask
     #   quart
-markupsafe==2.1.5
+markupsafe
     # via
     #   jinja2
     #   quart
     #   werkzeug
-multidict==6.1.0
+multidict
     # via
     #   aiohttp
     #   yarl
-numpy==2.1.1
+numpy
     # via
     #   -r requirements.in
     #   geopandas
     #   pandas
     #   pyogrio
     #   shapely
-packaging==24.1
+packaging
     # via
     #   geopandas
     #   pyogrio
-pandas==2.2.3
+pandas
     # via
     #   -r requirements.in
     #   geopandas
-priority==2.0.0
+priority
     # via hypercorn
-pydantic==2.9.2
+pydantic
     # via
     #   -r requirements.in
     #   pydantic-settings
-pydantic-core==2.23.4
+pydantic-core
     # via pydantic
-pydantic-settings==2.5.2
+pydantic-settings
     # via -r requirements.in
-pyogrio==0.9.0
+pyogrio
     # via geopandas
-pyproj==3.6.1
+pyproj
     # via geopandas
-python-dateutil==2.9.0.post0
+python-dateutil
     # via
     #   -r requirements.in
     #   pandas
-python-dotenv==1.0.1
+python-dotenv
     # via pydantic-settings
-pytz==2024.2
+pytz
     # via pandas
-quart==0.19.6
+quart
     # via
     #   -r requirements.in
     #   quart-cors
-quart-cors==0.7.0
+quart-cors
     # via -r requirements.in
-rtree==1.3.0
+rtree
     # via -r requirements.in
-shapely==2.0.6
+shapely
     # via
     #   -r requirements.in
     #   geopandas
-six==1.16.0
+six
     # via python-dateutil
-tqdm==4.66.5
+tqdm
     # via -r requirements.in
-typing-extensions==4.12.2
+typing-extensions
     # via
     #   pydantic
     #   pydantic-core
-tzdata==2024.1
+tzdata
     # via pandas
-werkzeug==3.0.4
+werkzeug
     # via
     #   flask
     #   quart
-wsproto==1.2.0
+wsproto
     # via hypercorn
-yarl==1.11.1
+yarl
     # via aiohttp
+autopep8

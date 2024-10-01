@@ -68,7 +68,9 @@ class GeoJSONHandler:
 
     def get_all_routes(self):
         logger.info(
-            f"Retrieving all routes. Total features: {len(self.historical_geojson_features)}"
+            f"Retrieving all routes. Total features: {
+                len(
+                    self.historical_geojson_features)}"
         )
         return self.historical_geojson_features
 

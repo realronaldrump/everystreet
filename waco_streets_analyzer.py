@@ -240,7 +240,8 @@ class WacoStreetsAnalyzer:
         traveled_streets = len(
             set(
                 self.segments_gdf.loc[
-                    self.segments_gdf["segment_id"].isin(self.traveled_segments),
+                    self.segments_gdf["segment_id"].isin(
+                        self.traveled_segments),
                     "street_id",
                 ]
             )

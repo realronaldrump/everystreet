@@ -2,6 +2,7 @@ import os
 import asyncio
 import json
 import logging
+from dateutil.parser import parse
 from datetime import date, datetime, timezone
 from time import time
 from cachetools import TTLCache
@@ -262,28 +263,24 @@ def register_routes(app):
     @app.websocket("/ws/live_route")
     async def ws_live_route():
         try:
-            last_sent_time = 0  # Initialize to track the last time data was sent
-
+            await bouncie_api.connect_websocket()
             while True:
-                current_time = time()  # Get the current timestamp
-
-                # Calculate the time difference since the last update
-                time_diff = current_time - last_sent_time
-
-                if time_diff >= 1:  # Check if at least 1 second has passed
-                    async with app.live_route_lock:
-                        data = app.live_route_data
-
-                    # Send the live route data to the client over the WebSocket
-                    # connection
-                    await websocket.send(json.dumps(data))
-
-                    # Update the last_sent_time to the current time
-                    last_sent_time = current_time
-
-                # Wait a small amount of time before the next check, e.g., 1
-                # second
-                await asyncio.sleep(1)
+                try:
+                    async for msg in bouncie_api.ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = json.loads(msg.data)
+                            if data['eventType'] == 'tripData':
+                                processed_data = await bouncie_api.process_live_data(data)
+                                if processed_data:
+                                    await websocket.send(json.dumps(processed_data))
+                        elif msg.type == aiohttp.WSMsgType.CLOSED:
+                            break
+                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                            break
+                except Exception as e:
+                    logger.error(f"Error in websocket connection: {e}")
+                    await asyncio.sleep(5)  # Wait before attempting to reconnect
+                    await bouncie_api.connect_websocket()
         except asyncio.CancelledError:
             # Handle WebSocket disconnection
             pass
@@ -371,40 +368,44 @@ def register_routes(app):
     async def update_historical_data():
         async with app.processing_lock:
             if app.is_processing:
-                return jsonify(
-                    {"error": "Another process is already running"}), 429
+                return jsonify({"error": "Another process is already running"}), 429
             try:
                 app.is_processing = True
                 logger.info("Starting historical data update process")
 
                 data = await request.get_json()
-                start_date = data.get("startDate")
-                end_date = data.get("endDate")
+                start_date = parse(data.get("startDate")).replace(tzinfo=timezone.utc)
+                end_date = parse(data.get("endDate")).replace(tzinfo=timezone.utc)
 
-                # Validate start_date and end_date format
-                try:
-                    if start_date:
-                        datetime.strptime(start_date, "%Y-%m-%d")
-                    if end_date:
-                        datetime.strptime(end_date, "%Y-%m-%d")
-                except ValueError:
-                    return (
-                        jsonify(
-                            {"error": "Invalid date format. Use YYYY-MM-DD."}),
-                        400,
-                    )
+                logger.info(f"Fetching historical data from {start_date} to {end_date}")
 
-                await geojson_handler.update_historical_data(
-                    fetch_all=False, start_date=start_date, end_date=end_date
-                )
+                trips = await app.bouncie_api.fetch_trip_data(start_date, end_date)
+                features = app.bouncie_api.create_geojson_features_from_trips(trips)
+
+                logger.info(f"Fetched {len(features)} new features")
+
+                # Update the historical data using GeoJSONHandler
+                await app.geojson_handler.update_historical_data(features)
+
+                # Update progress
+                await app.geojson_handler.update_all_progress()
+
+                # Update live route data if necessary
+                latest_feature = max(features, key=lambda f: f['properties']['timestamp']) if features else None
+                if latest_feature:
+                    app.live_route_data = {
+                        "type": "FeatureCollection",
+                        "features": [latest_feature]
+                    }
+                    save_live_route_data(app.live_route_data)
+
                 logger.info("Historical data update process completed")
-                return (
-                    jsonify({"message": "Historical data updated successfully!"}),
-                    200,
-                )
+                return jsonify({
+                    "message": "Historical data updated successfully!",
+                    "features_added": len(features)
+                }), 200
             except Exception as e:
-                logger.error(
-                    "An error occurred during the update process: %s", e)
+                logger.error(f"An error occurred during the update process: {e}", exc_info=True)
                 return jsonify({"error": f"An error occurred: {str(e)}"}), 500
             finally:
                 app.is_processing = False

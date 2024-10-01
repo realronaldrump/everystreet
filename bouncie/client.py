@@ -1,9 +1,7 @@
 import logging
-
-from bounciepy import AsyncRESTAPIClient
+import aiohttp
 
 logger = logging.getLogger(__name__)
-
 
 class BouncieClient:
     def __init__(
@@ -20,6 +18,7 @@ class BouncieClient:
         self.auth_code = auth_code
         self.device_imei = device_imei
         self.vehicle_id = vehicle_id
+        self.access_token = None
 
         if not all(
             [
@@ -34,23 +33,53 @@ class BouncieClient:
             raise ValueError(
                 "Missing required environment variables for BouncieAPI")
 
-        self.client = AsyncRESTAPIClient(
-            client_id=self.client_id,
-            client_secret=self.client_secret,
-            redirect_url=self.redirect_uri,
-            auth_code=self.auth_code,
-        )
-
     async def get_access_token(self):
+        if self.access_token:
+            return self.access_token
+
+        auth_url = "https://auth.bouncie.com/oauth/token"
+        payload = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": "authorization_code",
+            "code": self.auth_code,
+            "redirect_uri": self.redirect_uri
+        }
+
         try:
-            success = await self.client.get_access_token()
-            if not success:
-                logger.error("Failed to obtain access token.")
-                return False
-            return True
+            async with aiohttp.ClientSession() as session:
+                async with session.post(auth_url, data=payload) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        self.access_token = data.get('access_token')
+                        return self.access_token
+                    else:
+                        logger.error(f"Failed to obtain access token. Status: {response.status}")
+                        return None
         except Exception as e:
-            logger.error("Error getting access token: %s", e)
-            return False
+            logger.error(f"Error getting access token: {e}")
+            return None
 
     async def get_vehicle_by_imei(self):
-        return await self.client.get_vehicle_by_imei(imei=self.device_imei)
+        access_token = await self.get_access_token()
+        if not access_token:
+            return None
+
+        url = f"https://api.bouncie.dev/v1/vehicles?imei={self.device_imei}"
+        headers = {
+            "Authorization": access_token,
+            "Content-Type": "application/json"
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data[0] if data else None
+                    else:
+                        logger.error(f"Failed to get vehicle data. Status: {response.status}")
+                        return None
+        except Exception as e:
+            logger.error(f"Error getting vehicle data: {e}")
+            return None

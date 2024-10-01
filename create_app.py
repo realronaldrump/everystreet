@@ -54,6 +54,7 @@ async def create_app():
 
     # Initialize BouncieAPI (Single Instance)
     app.bouncie_api = BouncieAPI(app.config)
+    app.bouncie_api.start(app)  # Set up the webhook route
     logger.info("BouncieAPI initialized successfully")
 
     # Initialize WacoStreetsAnalyzer
@@ -80,6 +81,26 @@ async def create_app():
         Executes before the application starts serving requests.
         Any additional startup tasks can be added here.
         """
+        # Start the WebSocket connection and listening task
+        asyncio.create_task(app.bouncie_api.connect_websocket())
+        asyncio.create_task(app.bouncie_api.listen_for_live_data())
+
+    @app.after_serving
+    async def shutdown():
+        """
+        Executes after the application stops serving requests.
+        Clean up tasks and close connections.
+        """
+        logger.info("Shutting down application...")
+        try:
+            await app.task_manager.cancel_all()
+            logger.info("All tasks cancelled")
+            await app.bouncie_api.close_session()
+            logger.info("Bouncie API session closed")
+        except Exception as e:
+            logger.error("Error during shutdown: %s", str(e), exc_info=True)
+        finally:
+            logger.info("Shutdown complete")
 
     @app.after_request
     async def add_header(response):

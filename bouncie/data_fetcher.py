@@ -108,7 +108,7 @@ class DataFetcher:
             latitude = location.get("lat")
             longitude = location.get("lon")
             if not isinstance(latitude, (int, float)
-                              ) or not (-90 <= latitude <= 90):
+                              ) or not -90 <= latitude <= 90:
                 raise ValueError("Invalid latitude value")
             if not isinstance(longitude, (int, float)) or not (
                 -180 <= longitude <= 180

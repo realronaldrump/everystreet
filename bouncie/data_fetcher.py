@@ -8,6 +8,7 @@ from .geocoder import Geocoder
 
 logger = logging.getLogger(__name__)
 
+
 class DataFetcher:
     def __init__(self, client):
         self.client = client
@@ -15,7 +16,10 @@ class DataFetcher:
 
     async def fetch_trips(self, access_token, imei, start_date, end_date):
         url = "https://api.bouncie.dev/v1/trips"
-        headers = {"Authorization": access_token, "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
         params = {
             "imei": imei,
             "gps-format": "geojson",
@@ -26,11 +30,14 @@ class DataFetcher:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=headers, params=params) as response:
+                    response_text = await response.text()
                     if response.status == 200:
-                        return await response.json()
+                        response_data = json.loads(response_text)
+                        return response_data
                     else:
-                        logger.error(f"Failed to fetch trips. Status: {response.status}")
+                        logger.error(f"Failed to fetch trips. Status: {response.status}, Response: {response_text}")
                         return []
+
         except Exception as e:
             logger.error(f"Error fetching trips: {e}")
             return []

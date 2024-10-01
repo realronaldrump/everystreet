@@ -266,16 +266,19 @@ def register_routes(app):
             await bouncie_api.connect_websocket()
             while True:
                 try:
+                    if bouncie_api.ws is None:
+                        await asyncio.sleep(5)  # Wait before attempting to reconnect
+                        await bouncie_api.connect_websocket()
+                        continue
+
                     async for msg in bouncie_api.ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = json.loads(msg.data)
-                            if data['eventType'] == 'tripData':
+                            if data.get('eventType') == 'tripData':
                                 processed_data = await bouncie_api.process_live_data(data)
                                 if processed_data:
                                     await websocket.send(json.dumps(processed_data))
-                        elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                             break
                 except Exception as e:
                     logger.error(f"Error in websocket connection: {e}")

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import aiohttp
 import json
 from quart import Quart, request, jsonify
@@ -42,45 +42,15 @@ class BouncieAPI:
         if self.session and not self.session.closed:
             await self.session.close()
 
+    # Comment out or remove these methods
     async def connect_websocket(self):
-        await self.create_session()
-        if self.ws is None or self.ws.closed:
-            access_token = await self.client.get_access_token()
-            try:
-                self.ws = await self.session.ws_connect(
-                    f"wss://api.bouncie.dev/v1/stream?access_token={access_token}",
-                    ssl=False  # Try this if SSL verification is causing issues
-                )
-            except Exception as e:
-                logger.error(f"Failed to connect to WebSocket: {e}")
-                self.ws = None
+        pass
 
     async def listen_for_live_data(self):
-        while True:
-            try:
-                if self.ws:
-                    async for msg in self.ws:
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            data = json.loads(msg.data)
-                            await self.process_live_data(data)
-                        elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            break
-                else:
-                    logger.warning("WebSocket not connected. Falling back to polling.")
-                    await self.poll_for_data()
-            except Exception as e:
-                logger.error(f"Error in WebSocket connection: {e}")
-            finally:
-                await asyncio.sleep(5)  # Wait before attempting to reconnect
-                await self.connect_websocket()
+        pass
 
     async def reconnect_websocket(self):
-        await asyncio.sleep(5)  # Wait before attempting to reconnect
-        await self.connect_websocket()
-        if self.ws:
-            asyncio.create_task(self.listen_for_live_data())
+        pass
 
     async def poll_for_data(self):
         while True:
@@ -93,11 +63,23 @@ class BouncieAPI:
             await asyncio.sleep(1)  # Poll every second
 
     async def process_live_data(self, data):
-        if data['eventType'] == 'tripData':
+        if 'eventType' in data and data['eventType'] == 'tripData':
             new_data_point = await self.data_fetcher.process_vehicle_data(data)
             if new_data_point:
                 self.live_trip_data["data"].append(new_data_point)
                 self.live_trip_data["last_updated"] = datetime.now(timezone.utc)
+        elif 'latitude' in data and 'longitude' in data:
+            # Process data from polling
+            new_data_point = {
+                "latitude": data["latitude"],
+                "longitude": data["longitude"],
+                "timestamp": data.get("timestamp"),
+                "imei": data.get("imei")
+            }
+            self.live_trip_data["data"].append(new_data_point)
+            self.live_trip_data["last_updated"] = datetime.now(timezone.utc)
+        else:
+            logger.error("Data format not recognized in process_live_data")
 
     async def get_latest_bouncie_data(self):
         try:
@@ -106,15 +88,20 @@ class BouncieAPI:
                 logger.error("No vehicle data or stats found in Bouncie response")
                 return None
 
-            # Construct a data structure that matches what process_vehicle_data expects
+            # Extract latitude and longitude from vehicle_data
+            location = vehicle_data["stats"].get("location", {})
+            latitude = location.get("lat")
+            longitude = location.get("lon")
+
+            if latitude is None or longitude is None:
+                logger.error("No latitude or longitude found in vehicle data")
+                return None
+
             return {
-                'eventType': 'tripData',
-                'data': [{
-                    'timestamp': vehicle_data['stats'].get('lastUpdated'),
-                    'gps': vehicle_data['stats'].get('location', {}),
-                    'speed': vehicle_data['stats'].get('speed', 0)
-                }],
-                'imei': self.client.device_imei
+                "latitude": latitude,
+                "longitude": longitude,
+                "timestamp": vehicle_data["stats"].get("lastUpdated"),
+                "imei": self.client.device_imei
             }
         except Exception as e:
             logger.error(f"An error occurred while fetching live data: {e}")
@@ -124,11 +111,15 @@ class BouncieAPI:
         access_token = await self.client.get_access_token()
         all_trips = []
         current_start = start_date
+
         while current_start < end_date:
             current_end = min(current_start + timedelta(days=7), end_date)
-            trips = await self.data_fetcher.fetch_trips(access_token, self.client.device_imei, current_start, current_end)
+            trips = await self.data_fetcher.fetch_trips(
+                access_token, self.client.device_imei, current_start, current_end
+            )
             all_trips.extend(trips)
-            current_start = current_end
+            current_start = current_end + timedelta(seconds=1)
+
         return all_trips
 
     @staticmethod
@@ -140,12 +131,16 @@ class BouncieAPI:
                 if len(coordinates) >= 2:
                     features.append({
                         "type": "Feature",
-                        "geometry": {"type": "LineString", "coordinates": coordinates},
+                        "geometry": {
+                            "type": "LineString",
+                            "coordinates": coordinates
+                        },
                         "properties": {
                             "startTime": trip.get('startTime'),
                             "endTime": trip.get('endTime'),
                             "distance": trip.get('distance'),
-                            "transactionId": trip.get('transactionId')
+                            "transactionId": trip.get('transactionId'),
+                            # Add any other relevant properties from the trip object
                         }
                     })
         return features
@@ -168,5 +163,6 @@ class BouncieAPI:
 
     def start(self, app: Quart):
         self.setup_webhook_route(app)
-        asyncio.create_task(self.connect_websocket())
-        asyncio.create_task(self.listen_for_live_data())
+        # Remove these lines
+        # asyncio.create_task(self.connect_websocket())
+        # asyncio.create_task(self.listen_for_live_data())
